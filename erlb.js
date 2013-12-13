@@ -250,7 +250,7 @@ ErlClass.prototype.encode_binary = function (Obj, DV, Offset) {
 ErlClass.prototype.encode_tuple_size = function (Obj) {
     var n = 1 + (Obj.length < 256 ? 1 : 4);
     for (i = 0; i < Obj.length; i++) {
-        n += this.encode_inner(Obj.value[i]);
+        n += this.encode_size(Obj.value[i]);
     }
     return n;
 }
