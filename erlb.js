@@ -210,7 +210,7 @@ ErlClass.prototype.encode_number = function (Obj, DV, Offset) {
 };
 
 ErlClass.prototype.encode_float = function (Obj, DV, Offset) {
-    DV.setUInt8(Offset++, this.Enum.NEW_FLOAT);
+    DV.setUint8(Offset++, this.Enum.NEW_FLOAT);
     DV.setFloat64(Offset, Obj);
     Offset += 8;
     return { data: DV, offset: Offset };
@@ -234,7 +234,7 @@ ErlClass.prototype.encode_object = function (Obj, DV, Offset) {
 };
 
 ErlClass.prototype.encode_atom = function (Obj, DV, Offset) {
-    DV.setUInt8(Offset++, this.Enum.ATOM);
+    DV.setUint8(Offset++, this.Enum.ATOM);
     DV.setUint16(Offset, Obj.value.length);
     Offset += 2;
     for (var i = 0; i < Obj.value.length; ++i)
@@ -243,7 +243,7 @@ ErlClass.prototype.encode_atom = function (Obj, DV, Offset) {
 };
 
 ErlClass.prototype.encode_binary = function (Obj, DV, Offset) {
-    DV.setUInt8(Offset++, this.Enum.BINARY);
+    DV.setUint8(Offset++, this.Enum.BINARY);
     DV.setUint32(Offset, Obj.value.length);
     Offset += 4;
     for (var i = 0; i < Obj.value.length; ++i)
@@ -261,11 +261,11 @@ ErlClass.prototype.encode_tuple_size = function (Obj) {
 
 ErlClass.prototype.encode_tuple = function (Obj, DV, Offset) {
     if (Obj.length < 256) {
-        DV.setUInt8(Offset++, this.Enum.SMALL_TUPLE);
-        DV.setUInt8(Offset++, Obj.length);
+        DV.setUint8(Offset++, this.Enum.SMALL_TUPLE);
+        DV.setUint8(Offset++, Obj.length);
     } else {
-        DV.setUInt8(Offset++, this.Enum.LARGE_TUPLE);
-        DV.setUInt32(Offset, Obj.length);
+        DV.setUint8(Offset++, this.Enum.LARGE_TUPLE);
+        DV.setUint32(Offset, Obj.length);
         Offset += 4;
     }
     for (i = 0; i < Obj.length; i++) {
@@ -294,7 +294,7 @@ ErlClass.prototype.encode_array = function (Obj, DV, Offset) {
             Offset = r.offset;
         }
     }
-    DV.setUInt8(Offset++, this.Enum.NIL);
+    DV.setUint8(Offset++, this.Enum.NIL);
     return { data: DV, offset: Offset };
 };
 
