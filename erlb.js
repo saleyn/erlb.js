@@ -96,11 +96,10 @@ ErlClass.prototype.encode_size = function (Obj) {
         case "atom":    return 1 + Obj.encodeSize();
         case "tuple":   return 1 + this.encode_tuple_size(Obj);
         case "binary":  return 1 + Obj.encodeSize();
-        default:
-            var s = this.getClassName(Obj);
-            if (s.indexOf("Array") > -1) return 1 + this.encode_array_size(Obj);
-            throw ("Unknown object type: " + s);
     }
+    var s = this.getClassName(Obj);
+    if (s.indexOf("Array") > -1) return 1 + this.encode_array_size(Obj);
+    throw ("Unknown object type: " + s);
 };
 
 ErlClass.prototype.decode = function (buffer) {
@@ -215,14 +214,17 @@ ErlClass.prototype.encode_float = function (Obj, DV, Offset) {
 
 ErlClass.prototype.encode_object = function (Obj, DV, Offset) {
     // Check if it's an atom, binary, or tuple...
-    if (Obj === null){
+    if (Obj === null)
         return this.encode_inner(this.atom("null"));
-    }
     var s = Obj.constructor.toString();
 
-    if (s === "ErlAtom")            return this.encode_atom(Obj, DV, Offset);
-    if (s === "Binary")             return this.encode_binary(Obj, DV, Offset);
-    if (s === "Tuple")              return this.encode_tuple(Obj, DV, Offset);
+    switch (Obj.type) {
+        case "atom":    return this.encode_atom(Obj, DV, Offset);
+        case "binary":  return this.encode_binary(Obj, DV, Offset);
+        case "tuple":   return this.encode_tuple(Obj, DV, Offset);
+    }
+
+    var s = this.getClassName(Obj);
     if (s.indexOf("Array") != -1)   return this.encode_array(Obj, DV, Offset);
 
     // Treat the object as an associative array...
