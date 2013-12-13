@@ -213,10 +213,8 @@ ErlClass.prototype.encode_float = function (Obj, DV, Offset) {
 };
 
 ErlClass.prototype.encode_object = function (Obj, DV, Offset) {
-    // Check if it's an atom, binary, or tuple...
     if (Obj === null)
         return this.encode_inner(this.atom("null"));
-    var s = Obj.constructor.toString();
 
     switch (Obj.type) {
         case "atom":    return this.encode_atom(Obj, DV, Offset);
@@ -227,7 +225,7 @@ ErlClass.prototype.encode_object = function (Obj, DV, Offset) {
     var s = this.getClassName(Obj);
     if (s.indexOf("Array") != -1)   return this.encode_array(Obj, DV, Offset);
 
-    // Treat the object as an associative array...
+    // Treat the object as an associative array
     return this.encode_associative_array(Obj);
 };
 
