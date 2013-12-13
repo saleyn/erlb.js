@@ -14,7 +14,7 @@
 function ErlClass() {}
 
 function ErlAtom(S) {
-    //this.type = "Atom";
+    this.type = "atom";
     this.value = S;
 
     this.encodeSize = function() { return 1 + 1 + Math.min(255, this.value.length); }
@@ -22,7 +22,7 @@ function ErlAtom(S) {
 }
 
 function ErlBinary(Int8Arr) {
-    //this.type = "Binary";
+    this.type = "binary";
     this.value = Int8Arr;
     this.encodeSize = function() { return 1 + 4 + this.value.length; }
     this.toString = function () {
@@ -31,7 +31,7 @@ function ErlBinary(Int8Arr) {
 }
 
 function ErlTuple(Arr) {
-    //this.type = "Tuple";
+    this.type = "tuple";
     this.length = Arr.length;
     this.value = Arr;
 
@@ -92,14 +92,14 @@ ErlClass.prototype.encode_size = function (Obj) {
         case "number":  return 1 + this.encode_number_size(Obj);
         case "string":  return 1 + this.encode_string_size(Obj);
     }
-    var s = this.getClassName(Obj);
-    switch (s) {
-        case "ErlAtom":     return 1 + Obj.encodeSize();
-        case "ErlTuple":    return 1 + this.encode_tuple_size(Obj);
-        case "ErlBinary":   return 1 + Obj.encodeSize();
+    switch (Obj.type) {
+        case "atom":    return 1 + Obj.encodeSize();
+        case "tuple":   return 1 + this.encode_tuple_size(Obj);
+        case "binary":  return 1 + Obj.encodeSize();
         default:
+            var s = this.getClassName(Obj);
             if (s.indexOf("Array") > -1) return 1 + this.encode_array_size(Obj);
-        throw ("Unknown object type: " + s);
+            throw ("Unknown object type: " + s);
     }
 };
 
