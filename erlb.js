@@ -98,7 +98,7 @@ ErlClass.prototype.encode_size = function (Obj) {
         case "ErlTuple":    return 1 + this.encode_tuple_size(Obj);
         case "ErlBinary":   return 1 + Obj.encodeSize();
         default:
-            if (s.indexOf("Array") > -1) return 1 + Obj.encode_list_size(Obj);
+            if (s.indexOf("Array") > -1) return 1 + this.encode_array_size(Obj);
         throw ("Unknown object type: " + s);
     }
 };
@@ -250,7 +250,7 @@ ErlClass.prototype.encode_binary = function (Obj, DV, Offset) {
 ErlClass.prototype.encode_tuple_size = function (Obj) {
     var n = 1 + (Obj.length < 256 ? 1 : 4);
     for (i = 0; i < Obj.length; i++) {
-        n += this.encode_inner(Obj[i]);
+        n += this.encode_inner(Obj.value[i]);
     }
     return n;
 }
