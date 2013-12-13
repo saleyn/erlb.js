@@ -135,6 +135,10 @@ ErlClass.prototype.encode_inner = function (Obj, dataView, Offset) {
     return this[func](Obj, dataView, Offset);
 };
 
+ErlClass.prototype.encode_string_size = function (Obj) {
+    return 1 + 2 + Obj.length; // FIXME: implement encoding for length > 0xFF
+};
+
 ErlClass.prototype.encode_string = function (Obj, DV, Offset) {
     DV.setUint8(Offset++, this.Enum.STRING);
     DV.setUint16(Offset, Obj.length); // FIXME: check length > 0xFF
