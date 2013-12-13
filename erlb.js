@@ -269,7 +269,7 @@ ErlClass.prototype.encode_tuple = function (Obj, DV, Offset) {
         Offset += 4;
     }
     for (i = 0; i < Obj.length; i++) {
-        var r = this.encode_inner(Obj[i], DV, Offset);
+        var r = this.encode_inner(Obj.value[i], DV, Offset);
         Offset = r.offset;
     }
     return { data: DV, offset: Offset };
