@@ -17,7 +17,7 @@ function ErlAtom(S) {
     this.type = "atom";
     this.value = S;
 
-    this.encodeSize = function() { return 1 + 1 + Math.min(255, this.value.length); }
+    this.encodeSize = function() { return 1 + 2 + Math.min(255, this.value.length); }
     this.toString = function () { return S; };
 }
 
@@ -77,28 +77,28 @@ ErlClass.prototype.Enum = {
 }
 
 ErlClass.prototype.encode = function (Obj) {
-    var n = this.encode_size(Obj);
+    var n = 1 + this.encode_size(Obj);
     var b = new ArrayBuffer(n);
     var d = new DataView(b)
     d.setUint8(0, this.Enum.VERSION);
     var v = this.encode_inner(Obj, d, 1);
     if (v.offset !== n)
-        throw ("Invalid size of encoded buffer: " + len + " expected: " + n);
+        throw ("Invalid size of encoded buffer: " + v.offset + " expected: " + n);
     return b;
 };
 
 ErlClass.prototype.encode_size = function (Obj) {
     switch (typeof(Obj)) {
-        case "number":  return 1 + this.encode_number_size(Obj);
-        case "string":  return 1 + this.encode_string_size(Obj);
+        case "number":  return this.encode_number_size(Obj);
+        case "string":  return this.encode_string_size(Obj);
     }
     switch (Obj.type) {
-        case "atom":    return 1 + Obj.encodeSize();
-        case "tuple":   return 1 + this.encode_tuple_size(Obj);
-        case "binary":  return 1 + Obj.encodeSize();
+        case "atom":    return Obj.encodeSize();
+        case "tuple":   return this.encode_tuple_size(Obj);
+        case "binary":  return Obj.encodeSize();
     }
     var s = this.getClassName(Obj);
-    if (s.indexOf("Array") > -1) return 1 + this.encode_array_size(Obj);
+    if (s.indexOf("Array") > -1) return this.encode_array_size(Obj);
     throw ("Unknown object type: " + s);
 };
 
@@ -109,7 +109,7 @@ ErlClass.prototype.decode = function (buffer) {
     }
     var Obj = this.decode_inner({data: DV, offset: 1});
     if (Obj.offset !== buffer.byteLength) {
-        throw ("Erlang term buffer has unused " + buffer.byteLength - Obj.Offset + " bytes");
+        throw ("Erlang term buffer has unused " + buffer.byteLength - Obj.offset + " bytes");
     }
     return Obj.value;
 };
@@ -162,7 +162,7 @@ ErlClass.prototype.encode_number_size = function (Obj) {
     if (Obj >= 0 && Obj < 256) return 1 + 1;
 
     // 4 byte int...
-    if (Obj >= -(1 << 31) && Obj <= ((1 << 31)-1)) return 1 + 4;
+    if (Obj >= -2147483648 && Obj <= 2147483647) return 1 + 4;
 
     // Bignum...
     var n = 0;
@@ -186,10 +186,10 @@ ErlClass.prototype.encode_number = function (Obj, DV, Offset) {
     }
 
     // 4 byte int...
-    if (Obj >= -(1 << 31) && Obj <= ((1 << 31)-1)) {
+    if (Obj >= -2147483648 && Obj <= 2147483647) {
         DV.setUint8(Offset++, this.Enum.INTEGER);
-        DV.setUint32(Offset++, Obj);
-        return { data: DV, offset: Offset };
+        DV.setUint32(Offset, Obj);
+        return { data: DV, offset: Offset+4 };
     }
 
     // Bignum...
@@ -198,7 +198,7 @@ ErlClass.prototype.encode_number = function (Obj, DV, Offset) {
 
     var n = 0;
     for (; Obj; ++n)
-        Obj >>= (n * 8);
+        Obj >>= (n * 8); // FIXME: Don't use bitwise ops
     var code = n < 256 ? this.Enum.SMALL_BIG : this.Enum.LARGE_BIG;
     DV.setUint8(Offset++, code);
 
@@ -368,7 +368,7 @@ ErlClass.prototype.decode_binary = function (Obj) {
         throw ("Invalid Erlang binary: " + Type + " at offset " + Offset);
     var N = DV.getUint32(Offset); Offset += 4;
     var A = new Uint8Array(DV.buffer, Offset, N);
-    return { value: this.binary(A), offset: Offset };
+    return { value: this.binary(A), offset: Offset+N };
 };
 
 ErlClass.prototype.decode_integer = function (Obj) {
@@ -395,7 +395,7 @@ ErlClass.prototype.decode_integer = function (Obj) {
             Sign = DV.getUint8(Offset++);
             V = 0;
             for (var i = 0; i < Arity; i++)
-                V |= DV.getUint8(Offset++) << (i * 8);
+                V |= DV.getUint8(Offset++) << (i * 8); // Fixme: replace bitwize ops
 
             if (Sign)
                 V = -V;
