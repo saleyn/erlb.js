@@ -1,7 +1,8 @@
 // erlb.js
 // Copyright (c) 2013 Serge Aleynikov <saleyn@gmail.com>
 // See BSD for licensing information.
-
+// This project originated with Berj (https://github.com/rustyio/BERT-JS)
+// but ended up being a complete rewrite.
 
 // erlb.js is a Javascript implementation of Erlang Binary External Term Format.
 // - http://github.com/erlb.js
