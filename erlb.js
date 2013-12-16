@@ -520,4 +520,4 @@ ErlClass.prototype.decode_tuple = function (Obj) {
 
 // - UTILITY FUNCTIONS -
 
-var Bert = new ErlClass();
+var Erl = new ErlClass();
