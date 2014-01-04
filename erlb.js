@@ -17,82 +17,82 @@
 
 function Erl() {}
 
+function ErlObject() {}
+ErlObject.prototype.type        = 'erl';
+ErlObject.prototype.toString    = function() { return this.type; };
+ErlObject.prototype.extend      = function(Child, Type) {
+    var F = function(){};
+    F.prototype = ErlObject.prototype;
+    Child.prototype = new F();
+    Child.prototype.constructor = Child;
+    Child.prototype.type = Type;
+}
+
+
 function ErlAtom(S) {
     this.value = S;
 }
-ErlAtom.prototype = {
-      type      : "atom"
-    , equals    : function(a){ return a.type == "atom" && this.value === a.value; }
-    , encodeSize: function() { return 1 + 2 + Math.min(255, this.value.length); }
-    , toString  : function() { return this.value; }
-};
+ErlObject.prototype.extend(ErlAtom, 'atom');
+ErlAtom.prototype.equals        = function(a) {
+        return a instanceof ErlAtom && this.value === a.value;
+    };
+ErlAtom.prototype.encodeSize    = function() { return 3 + Math.min(255, this.value.length); };
+ErlAtom.prototype.toString      = function() {
+        var v = this.value;
+        return (!v.length || v[0] < "a" || v[0] > "z")
+            ? "'" + this.value + "'"
+            : this.value;
+    };
 
 
 function ErlBinary(Arr) {
-    if (Arr instanceof Array)
-        this.value = Arr;
-    else if (Arr instanceof ArrayBuffer)
-        this.value = new Uint8Array(Arr);
-    else if (Arr instanceof Uint8Array)
-        this.value = Arr;
-    else if (Arr instanceof Int8Array)
-        this.value = Arr;
-    else
-        throw new Error("Unsupported binary data type: " +
-                        Erl.getClassName.call(this, Arr));
+    if (!(Arr instanceof Array))
+        throw new Error("Unsupported binary data type: " + Erl.getClassName(Arr));
+    this.value = Arr;
 }
-ErlBinary.prototype = {
-      type      : "binary"
-    , equals    : function(a) { return a.type == "binary" && this.value.equals(a.value); }
-    , encodeSize: function() { return 1 + 4 + this.value.length; }
-    , toString  : function() {
-            var n = 0;
-            var a = this.value;
-            for (var i=0, m=a.length; i < m; ++i, ++n) {
-                var c = a[i];
-                if (c < 31 || c > 126)
-                     break;
-            }
-            var printable = a.length > 0 && n === a.length;
-            var s = "<<";
-            if (printable) s += '"';
-            if (a.length)  s += a[0];
-            for (var i=1, m=a.length; i < m; ++i)
-                s += ',' + a[i];
-            return s + (printable ? '">>' : '>>');
-        }
-};
+ErlObject.prototype.extend(ErlBinary, 'binary');
+ErlBinary.prototype.equals      = function(a) {
+        return a instanceof ErlBinary && this.value.equals(a.value);
+    };
+ErlBinary.prototype.encodeSize  = function() { return 1 + 4 + this.value.length; };
+ErlBinary.prototype.toString    = function() {
+        var a = this.value;
+        var s = "<<";
+        var printable = a.length > 0 && a.every(function(i) { return i > 30 && i < 127; });
+        return printable
+            ? '<<"' + a.map(function(i) { return String.fromCharCode(i); }).join('') + '">>'
+            : '<<' + a.join(',') + '>>';
+    };
 
 function ErlTuple(Arr) {
     this.value  = Arr;
     this.length = Arr === undefined ? 0 : Arr.length;
 }
-ErlTuple.prototype = {
-      type      : "tuple"
-    , equals    : function(a) {
-            return a.type == "tuple" && this.value.equals(a.value);
-        }
-    , toString  : function() {
-            var s = "{";
-            if (this.length > 0) s += this.value[0].toString();
-            for (var i = 1, n = this.value.length; i < n; i++)
-                s += "," +
-                    (typeof(this.value[i]) === "string" ? '"'+this.value[i]+'"'
-                                                        : this.value[i]);
-            return s + "}";
-        }
-    , toDate    : function() { return new Date(this.toTimestamp()); }
-    , toTimestamp:function() {
-            if (length !== 3) return -1;
-            var n = value[0] * 1000000000 + value[1] * 1000 + value[2] / 1000;
-            return isNaN(n) ? -1 : n;
-        }
-};
+ErlObject.prototype.extend(ErlTuple, 'tuple');
+ErlTuple.prototype.equals       = function(a) {
+        return a instanceof ErlTuple && this.value.equals(a.value);
+    };
+ErlTuple.prototype.encodeSize   = function() {
+        return this.value.reduce(
+            function(s,i) { return s + Erl.encode_size(i); },
+            1 + (this.length < 256 ? 1 : 4));
+    };
+ErlTuple.prototype.toString     = function() {
+        var s = "{" + this.value.map(function(e) { return Erl.toString(e);}).join(',');
+        return s + "}";
+    };
+ErlTuple.prototype.toDate       = function() { return new Date(this.toTimestamp()); };
+ErlTuple.prototype.toTimestamp  = function() {
+        if (length !== 3) return -1;
+        var n = value[0] * 1000000000 + value[1] * 1000 + value[2] / 1000;
+        return isNaN(n) ? -1 : n;
+    };
+
 
 function ErlPid(Node, Id, Serial, Creation) {
     if (typeof(Node) === 'string')
         Node = new ErlAtom(Node);
-    else if (Node.type !== 'atom')
+    else if (!(Node instanceof ErlAtom))
         throw new Error("Node argument must be an atom!");
 
     this.node = Node;
@@ -100,23 +100,22 @@ function ErlPid(Node, Id, Serial, Creation) {
               | ((Serial & 0x1fff) << 2)
               | (Creation & 0x3)) & 0x3fffFFFF;
 }
-ErlPid.prototype = {
-      type      : "pid"
-    , equals    : function(a) {
-            return a.type == "pid" && this.node.equals(a.node) && this.num === a.num;
-        }
-    , encodeSize: function() { return 1 + this.node.encodeSize() + 4 + 4 + 1; }
-    , toString  : function() {
-            return "#pid{" + this.node + "," +
-                   (this.num >> 15) + "," +
-                   ((m_Num >> 2) & 0x1fff) + "}";
-        }
-};
+ErlObject.prototype.extend(ErlPid, 'pid');
+ErlPid.prototype.equals         = function(a) {
+        return a instanceof ErlPid && this.node.equals(a.node) && this.num === a.num;
+    };
+ErlPid.prototype.encodeSize     = function() { return 1 + this.node.encodeSize() + 9; };
+ErlPid.prototype.toString       = function() {
+        return "#pid{" + this.node + "," +
+               (this.num >> 15) + "," +
+               ((this.num >> 2) & 0x1fff) + "}";
+    };
+
 
 function ErlRef(Node, Creation, IDs) {
     if (typeof(Node) === 'string')
         Node = new ErlAtom(Node);
-    else if (Node.type !== "atom")
+    else if (!(Node instanceof ErlAtom))
         throw new Error("Node argument must be an atom!");
     if (!(IDs instanceof Array) || IDs.length > 3)
         throw new Error("Reference IDs must be an array of length <= 3!");
@@ -124,55 +123,47 @@ function ErlRef(Node, Creation, IDs) {
     this.creation = Creation & 0x3;
     this.ids = IDs;
 }
-ErlRef.prototype = {
-      type      : "ref"
-    , equals    : function(a) {
-            return a.type == "ref" && this.node.equals(a.node)
-                && this.creation === a.creation
-                && this.ids.equals(a.ids);
-        }
-    , encodeSize: function() {
-            return 1 + 2 + this.node.encodeSize() + 4*this.ids.length + 1;
-        }
-    , toString  : function() {
-            var s = "#ref{" + this.node.toString() + ", ";
-            var n = this.ids.length;
-            if (n > 0) s += this.ids[0];
-            for (var i=1; i < n; ++i)
-                s += "," + this.ids[i];
-            return s + "}";
-        }
-};
+ErlObject.prototype.extend(ErlRef, 'ref');
+ErlRef.prototype.equals         = function(a) {
+        return a instanceof ErlRef && this.node.equals(a.node)
+            && this.creation === a.creation
+            && this.ids.equals(a.ids);
+    };
+ErlRef.prototype.encodeSize     = function() {
+        return 1 + 2 + this.node.encodeSize() + 4*this.ids.length + 1;
+    }
+ErlRef.prototype.toString       = function() {
+        var s = "#ref{" + this.node.toString() + ", ";
+        return s + (this.ids.length ? this.ids.join(',') : '') + '}';
+    };
 
 function ErlVar(Name, Type) {
     this.valueType = Type;
     this.name = Name;
 }
-ErlVar.prototype = {
-      type      : "var"
-    , equals    : function(a) { return false; }
-    , encodeSize: function()  { throw new Error("Cannot encode variables!"); }
-    , toString  : function() {
-            var tp;
-            switch (this.valueType) {
-                case Erl.Enum.ATOM:        tp = "::atom()";    break;
-                case Erl.Enum.BINARY:      tp = "::binary()";  break;
-                case Erl.Enum.ErlBoolean:  tp = "::bool()";    break;
-                case Erl.Enum.ErlByte:     tp = "::byte()";    break;
-                case Erl.Enum.ErlDouble:   tp = "::double()";  break;
-                case Erl.Enum.ErlLong:     tp = "::int()";     break;
-                case Erl.Enum.ErlList:     tp = "::list()";    break;
-                case Erl.Enum.ErlPid:      tp = "::pid()";     break;
-                case Erl.Enum.ErlPort:     tp = "::port()";    break;
-                case Erl.Enum.ErlRef:      tp = "::ref()";     break;
-                case Erl.Enum.ErlString:   tp = "::string()";  break;
-                case Erl.Enum.ErlTuple:    tp = "::tuple()";   break;
-                case Erl.Enum.ErlVar:      tp = "::var()";     break;
-                default:                   tp = "";            break;
-            }
-            return this.name + tp;
+ErlObject.prototype.extend(ErlVar, 'binary');
+ErlVar.prototype.equals         = function(a) { return false; };
+ErlVar.prototype.encodeSize     = function()  { throw new Error("Cannot encode variables!"); };
+ErlVar.prototype.toString       = function() {
+        var tp;
+        switch (this.valueType) {
+            case Erl.Enum.ATOM:        tp = "::atom()";    break;
+            case Erl.Enum.BINARY:      tp = "::binary()";  break;
+            case Erl.Enum.ErlBoolean:  tp = "::bool()";    break;
+            case Erl.Enum.ErlByte:     tp = "::byte()";    break;
+            case Erl.Enum.ErlDouble:   tp = "::double()";  break;
+            case Erl.Enum.ErlLong:     tp = "::int()";     break;
+            case Erl.Enum.ErlList:     tp = "::list()";    break;
+            case Erl.Enum.ErlPid:      tp = "::pid()";     break;
+            case Erl.Enum.ErlPort:     tp = "::port()";    break;
+            case Erl.Enum.ErlRef:      tp = "::ref()";     break;
+            case Erl.Enum.ErlString:   tp = "::string()";  break;
+            case Erl.Enum.ErlTuple:    tp = "::tuple()";   break;
+            case Erl.Enum.ErlVar:      tp = "::var()";     break;
+            default:                   tp = "";            break;
         }
-};
+        return this.name + tp;
+    };
 
 //-----------------------------------------------------------------------------
 // - INTERFACE -
@@ -207,25 +198,21 @@ Erl.prototype.equals = function () {
     var b = arguments.length > 1 ? arguments[1] : this;
     if (a === b)
         return true;
-    switch (a.type) {
-        case "atom":    return a.equals(b);
-        case "tuple":   return a.equals(b) || (b instanceof Date && a.toTimestamp() === b.getTime());
-        case "binary":  return a.equals(b);
-        case "pid":     return a.equals(b);
-        case "ref":     return a.equals(b);
-    }
-    if (a instanceof Date && b.type === 'tuple')
+    if (ErlObject.prototype.isPrototypeOf(a))
+        return a.equals(b)
+            || (a instanceof ErlTuple && b instanceof Date && a.toTimestamp() === b.getTime());
+
+    if (a instanceof Date && b instanceof ErlTuple)
         return b.toTimestamp() === a.getTime();
-    var s = this.getClassName(a);
-    if (s === "Array")
-        return this.getClassName(b) == "Array" && a.equals(b);
+    if (a instanceof Array)
+        return b instanceof Array && a.equals(b);
 
     // Compare two objects for equality
     if (a instanceof Object != b instanceof Object)
         return false;
 
-    for (var k in a) if (!k in b) return false;
-    for (var k in b) if (!k in a) return false;
+    for (var k in a) if (!(k in b)) return false;
+    for (var k in b) if (!(k in a)) return false;
     for (var k in a) {
         var av = a[k];
         var bv = b[k];
@@ -233,6 +220,28 @@ Erl.prototype.equals = function () {
             return false;
     }
     return true;
+}
+
+Erl.prototype.toString = function(Obj) {
+    if (Obj === undefined)  return "undefined";
+    if (Obj === null)       return "null";
+
+    switch (typeof(Obj)) {
+        case 'number':  return Obj.toString();
+        case 'boolean': return Obj.toString();
+        case 'string':  return '"' + Obj.toString() + '"';
+    }
+    if (ErlObject.prototype.isPrototypeOf(Obj))
+        return Obj.toString();
+    if (Obj instanceof Array) {
+        return '[' + Obj.map(function(e) { return Erl.toString(e); }).join(",") + ']';
+    }
+
+    return '['
+        + Object.keys(Obj).map(function(k) {
+                return '{' + k + ',' + Erl.toString(Obj[k]) + '}';
+            }).join(",")
+        + ']';
 }
 
 Erl.prototype.atom = function (Obj) {
@@ -264,6 +273,14 @@ Erl.prototype.toArrayBuffer = function(A) {
     for (var i=0, n=A.length; i < n; ++i)
         d.setUint8(i, A[i]);
     return b;
+}
+
+Erl.prototype.bufferToArray = function(B) {
+    var d = new DataView(B);
+    var r = new Array(d.byteLength);
+    for (var i=0, n=d.byteLength; i < n; ++i)
+        r[i] = d.getUint8(i);
+    return r;
 }
 
 //-----------------------------------------------------------------------------
@@ -306,9 +323,11 @@ Erl.prototype.encode_size = function (Obj) {
         case "boolean":     return Obj ? 7 : 8; // Atom "true" or "false"
         case "undefined":   return this.atom("undefined").encodeSize();
     }
+    if (Obj === null)
+        return this.atom("null").encodeSize();
     switch (Obj.type) {
         case "atom":        return Obj.encodeSize();
-        case "tuple":       return this.encode_tuple_size(Obj);
+        case "tuple":       return Obj.encodeSize();
         case "binary":      return Obj.encodeSize();
         case "pid":         return Obj.encodeSize();
         case "ref":         return Obj.encodeSize();
@@ -325,7 +344,7 @@ Erl.prototype.encode_inner = function (Obj, dataView, Offset) {
 
 Erl.prototype.encode_object = function (Obj, DV, Offset) {
     if (Obj === null)
-        return this.encode_inner(this.atom("null"));
+        return this.encode_inner(this.atom("null"), DV, Offset);
 
     switch (Obj.type) {
         case "atom":    return this.encode_atom(Obj, DV, Offset);
@@ -422,8 +441,7 @@ Erl.prototype.encode_number = function (Obj, DV, Offset) {
 Erl.prototype.encode_float = function (Obj, DV, Offset) {
     DV.setUint8(Offset++, this.Enum.NEW_FLOAT);
     DV.setFloat64(Offset, Obj);
-    Offset += 8;
-    return { data: DV, offset: Offset };
+    return { data: DV, offset: Offset+8 };
 };
 
 Erl.prototype.encode_atom = function (Obj, DV, Offset) {
@@ -444,14 +462,6 @@ Erl.prototype.encode_binary = function (Obj, DV, Offset) {
     return { data: DV, offset: Offset };
 };
 
-Erl.prototype.encode_tuple_size = function (Obj) {
-    var k = Obj.length;
-    var n = 1 + (k < 256 ? 1 : 4);
-    for (var i = 0; i < k; i++)
-        n += this.encode_size(Obj.value[i]);
-    return n;
-}
-
 Erl.prototype.encode_tuple = function (Obj, DV, Offset) {
     var n = Obj.length;
     if (n < 256) {
@@ -462,11 +472,9 @@ Erl.prototype.encode_tuple = function (Obj, DV, Offset) {
         DV.setUint32(Offset, n);
         Offset += 4;
     }
-    for (var i = 0; i < n; i++) {
-        var r = this.encode_inner(Obj.value[i], DV, Offset);
-        Offset = r.offset;
-    }
-    return { data: DV, offset: Offset };
+    return Obj.value.reduce(
+        function(a, e) { return Erl.encode_inner(e, a.data, a.offset); },
+        {data: DV, offset: Offset});
 };
 
 Erl.prototype.encode_pid = function (Obj, DV, Offset) {
@@ -485,29 +493,22 @@ Erl.prototype.encode_ref = function (Obj, DV, Offset) {
     var r = this.encode_atom(Obj.node, DV, Offset);
     Offset = r.offset;
     DV.setUint8(Offset++, this.creation);
-    for (var i=0; i < Obj.ids.length; ++i, Offset += 4)
-        DV.setUint32(Offset, Obj.ids[i]);
+    Offset = Obj.ids.reduce(function(n,i) { DV.setUint32(n, i); return n+4; }, Offset);
     return { data: DV, offset: Offset };
 };
 
 Erl.prototype.encode_array_size = function (Obj) {
-    var n = 1;
-    if (Obj.length > 0) {
-        n += 1 + 4;
-        for (var i = 0, m = Obj.length; i < m; i++)
-            n += this.encode_size(Obj[i]);
-    }
-    return n;
+    return Obj.reduce(function(a,e) { return a + Erl.encode_size(e); }, Obj.length ? 6 : 1)
 };
 
 Erl.prototype.encode_array = function (Obj, DV, Offset) {
     if (Obj.length > 0) {
         DV.setUint8(Offset++, this.Enum.LIST);
         DV.setUint32(Offset, Obj.length); Offset += 4;
-        for (var i = 0, n = Obj.length; i < n; i++) {
-            var r = this.encode_inner(Obj[i], DV, Offset);
-            Offset = r.offset;
-        }
+        Offset = Obj.reduce(
+            function(n,e) { var r = Erl.encode_inner(e, DV, n); return r.offset; },
+            Offset
+        );
     }
     DV.setUint8(Offset++, this.Enum.NIL);
     return { data: DV, offset: Offset };
@@ -583,6 +584,7 @@ Erl.prototype.decode_atom = function (Obj) {
         case "true":        v = true; break;
         case "false":       v = false; break;
         case "undefined":   v = undefined; break;
+        case "null":        v = null; break;
         default:            v = this.atom(s);
     }
     return { value: v, offset: Offset };
@@ -595,7 +597,8 @@ Erl.prototype.decode_binary = function (Obj) {
     if (Type !== this.Enum.BINARY)
         throw new Error("Invalid Erlang binary: " + Type + " at offset " + Offset);
     var n = DV.getUint32(Offset); Offset += 4;
-    var a = new Uint8Array(DV.buffer, Offset, n);
+    var a = new Array(n);
+    for (var i=Offset, j=0, m = Offset+n; i < m; ++i, ++j) a[j] = DV.getUint8(i);
     return { value: this.binary(a), offset: Offset+n };
 };
 
@@ -705,24 +708,21 @@ Erl.prototype.decode_list = function (Obj) {
         case this.Enum.LIST:
             n = DV.getUint32(Offset);
             Obj.offset = Offset + 4;
-            r = [];
+            r = new Array(n);
             for (var i = 0; i < n; ++i) {
-                var Res = this.decode_inner(Obj);
-                r.push(Res.value);
+                var Res = Erl.decode_inner(Obj);
+                r[i] = Res.value;
                 Obj.offset = Res.offset;
             }
             Offset = Obj.offset;
             if (DV.byteLength > Offset && DV.getUint8(Offset) === this.Enum.NIL)
                 Offset++;
             // Check if the list is an associative array
-            var b = true;
-            for (var i = 0; i < n; ++i)
-                if (r[i].type !== "tuple" || r[i].length !== 2 || r[i].value[0].type !== "atom") {
-                    b = false;
-                    break;
-                }
-            if (b) {
+            if (r.every(function(e) {
+                    return e instanceof ErlTuple && e.length === 2 && e.value[0] instanceof ErlAtom; })
+            ) {
                 // Try to convert the associative array to an object
+                var b = true;
                 var out = {};
                 for (var i=0; i < n; ++i) {
                     var e = r[i];
@@ -765,10 +765,10 @@ Erl.prototype.decode_tuple = function (Obj) {
             throw new Error("Invalid Erlang tuple type: " +
                             Type + " at offset " + Offset);
     }
-    var r = [];
+    var r = new Array(n);
     for (var i = 0; i < n; i++) {
-        var res = this.decode_inner(Obj);
-        r.push(res.value);
+        var res = Erl.decode_inner(Obj);
+        r[i] = res.value;
         Obj.offset = res.offset;
     }
     return { value: this.tuple.apply(this, r), offset: Obj.offset };
@@ -836,6 +836,21 @@ Erl.prototype.dateToTuple = function(d) {
 
 var Erl = new Erl();
 
+/*
+// Override console log to display Erl objects friendly
+(function() {
+    var cl = console.log;
+    console.log = function() {
+        cl.apply(console, [].slice.call(arguments).map(function(el) {
+            return typeof el === 'object' // {}.toString.call(el) === '[object Object]'
+                && typeof el.toString === 'function'
+                && el.toString !== Object.prototype.toString ? el.toString() : el;
+        }));
+    };
+    console.oldlog = cl;
+}());
+*/
+
 // attach the .equals method to Array's prototype to call it on any array
 Array.prototype.equals = function (array) {
     // if the other array is undefined or null return a false value
@@ -864,10 +879,8 @@ Array.prototype.equals = function (array) {
 ArrayBuffer.prototype.equals = function (array) {
     if (!array)
         return false;
-    var c1 = Erl.getClassName(this);
-    var c2 = Erl.getClassName(array);
-    var a = c1 === 'ArrayBuffer' ? new Uint8Array(this) : this;
-    var b = c2 === 'ArrayBuffer' ? new Uint8Array(array): array;
+    var a = new Uint8Array(this);
+    var b = array instanceof ArrayBuffer ? new Uint8Array(array): array;
     // compare lengths - can save a lot of time
     if (a.length != b.length)
         return false;
