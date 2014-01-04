@@ -557,7 +557,7 @@ Erl.prototype.decode_binary = function (Obj) {
     if (Type !== this.Enum.BINARY)
         throw new Error("Invalid Erlang binary: " + Type + " at offset " + Offset);
     var n = DV.getUint32(Offset); Offset += 4;
-    var a = new Uint8Array(DV.buffer, Offset, N);
+    var a = new Uint8Array(DV.buffer, Offset, n);
     return { value: this.binary(a), offset: Offset+n };
 };
 
