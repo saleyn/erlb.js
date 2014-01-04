@@ -25,11 +25,6 @@ Interface
 * <b>Erl.tuple(Array)</b> - Create a Javascript object that will be encoded to a Tuple.
 * <b>Erl.pid(Node, Id, Ser, Creation)</b> - Create a Javascript object that will be encoded to a Pid.
 * <b>Erl.ref(Node, Creation, IDs)</b> - Create a Javascript object that will be encoded to a Ref.
-* <b>Erl.toArrayBuffer(Array)</b> - Convert array of bytes to a binary buffer.
-* <b>Erl.timestampToTuple(Int)</b> - Convert a timestamp (number of ms since epoch) to
-    {MegaSec, Sec, MicroSec} tuple.
-* <b>Erl.dateToTuple(Date)</b> - Convert a Javascript Date to
-    {MegaSec, Sec, MicroSec} tuple.
 
 The library natively understands the following Javascript types:
 
@@ -38,6 +33,16 @@ The library natively understands the following Javascript types:
 * Boolean
 * Array (Erlang list)
 * Object (Erlang proplists)
+
+Utility Functions
+-----------------
+
+* <b>Erl.toArrayBuffer(Array)</b> - Convert array of bytes to a binary buffer.
+* <b>Erl.bufferToArray(ArrayBuffer)</b> - Convert a binary buffer to an array of bytes.
+* <b>Erl.timestampToTuple(Int)</b> - Convert a timestamp (number of ms since epoch) to
+    {MegaSec, Sec, MicroSec} tuple.
+* <b>Erl.dateToTuple(Date)</b> - Convert a Javascript Date to
+    {MegaSec, Sec, MicroSec} tuple.
 
 Testing
 -------
