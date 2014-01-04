@@ -21,10 +21,15 @@ Interface
 * <b>Erl.equals(Obj1, Obj2)</b> - Compare Obj1 and Obj2 for equality.
 * <b>Erl.toString(Obj)</b> - Print a Javascript object in the Erlang notation.
 * <b>Erl.atom(String)</b> - Create a Javascript object that will be encoded to an Atom.
-* <b>Erl.binary(Int8Array)</b> - Create a Javascript object that will be encoded to an Binary.
+* <b>Erl.binary(UInt8Array)</b> - Create a Javascript object that will be encoded to an Binary.
 * <b>Erl.tuple(Array)</b> - Create a Javascript object that will be encoded to a Tuple.
 * <b>Erl.pid(Node, Id, Ser, Creation)</b> - Create a Javascript object that will be encoded to a Pid.
 * <b>Erl.ref(Node, Creation, IDs)</b> - Create a Javascript object that will be encoded to a Ref.
+* <b>Erl.toArrayBuffer(Array)</b> - Convert array of bytes to a binary buffer.
+* <b>Erl.timestampToTuple(Int)</b> - Convert a timestamp (number of ms since epoch) to
+    {MegaSec, Sec, MicroSec} tuple.
+* <b>Erl.dateToTuple(Date)</b> - Convert a Javascript Date to
+    {MegaSec, Sec, MicroSec} tuple.
 
 The library natively understands the following Javascript types:
 
