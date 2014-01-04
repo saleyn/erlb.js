@@ -3,14 +3,16 @@
 // Copyright (c) 2013 Serge Aleynikov <saleyn@gmail.com>
 // See BSD for licensing information.
 //
-// Test cases for erlb.js
+// Test cases for erlb.js using QUnit testing framework
+//    http://api.qunitjs.com
 
 function erlb_test() {
     function doTest(msg, actual, expected) {
-        ok(Erl.encode(actual).equals(expected), "Encode " + msg);
-        ok(Erl.equals(actual, Erl.decode(Erl.toArrayBuffer(expected))), "Decode " + msg);
+        deepEqual(Erl.bufferToArray(Erl.encode(actual)), expected, "Encode " + msg);
+        deepEqual(Erl.decode(Erl.toArrayBuffer(expected)), actual, "Decode " + msg);
     }
 
+    // -- Test encoding --
     doTest("string",        "abcd",             [131,107,0,4,97,98,99,100]);
     doTest("atom",          Erl.atom("hello"),  [131,100,0,5,104,101,108,108,111]);
     doTest("undefined",     undefined,          [131,100,0,9,117,110,100,101,102,105,110,101,100]);
@@ -40,4 +42,19 @@ function erlb_test() {
                                                  108,0,0,0,2,97,1,107,0,1,97,106,104,2,100,0,1,99,106,104,
                                                  2,100,0,1,100,70,64,36,51,51,51,51,51,51,104,2,100,0,1,101,
                                                  107,0,3,97,98,99,106]);
+
+    // -- Test stringification --
+    equal(Erl.toString("abc"),                  '"abc"',        'Erl.toString("abc")');
+    equal(Erl.toString(Erl.atom("abc")),        "abc",          "Erl.toString(ErlAtom)");
+    equal(Erl.toString(Erl.binary([1,2,3])),    "<<1,2,3>>",    "Erl.toString(ErlBinary)");
+    equal(Erl.toString(undefined),              "undefined",    "Erl.toString(undefined)");
+    equal(Erl.toString(null),                   "null",         "Erl.toString(null)");
+    equal(Erl.toString(true),                   "true",         "Erl.toString(Boolean)");
+    equal(Erl.toString(123456),                 "123456",       "Erl.toString(Int)");
+    equal(Erl.toString(123.456),                "123.456",      "Erl.toString(Float)");
+    equal(Erl.toString(Erl.pid("a@b",1,2,3)),   "#pid{a@b,1,2}", "Erl.toString(Pid)");
+    equal(Erl.toString(Erl.ref("a@b",0,[1,2,3])),"#ref{a@b, 1,2,3}", "Erl.toString(Ref)");
+    equal(Erl.toString(Erl.tuple(1,"abc",[])),  '{1,"abc",[]}', "Erl.toString(ErlTuple)");
+    equal(Erl.toString([1,"a",[],Erl.tuple(1,Erl.atom('b'))]), '[1,"a",[],{1,b}]', "Erl.toString(List)");
+    equal(Erl.toString({a:1, b:[1,2], c:"abc"}), '[{a,1},{b,[1,2]},{c,"abc"}]', "Erl.toString(PropList)");
 }
