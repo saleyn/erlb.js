@@ -15,7 +15,7 @@ Interface
 
 * <b>Erl.encode(Object)</b> - Encode a Javascript object into ETF, return ArrayBuffer
     suitable for sending via websocket. The object can be a Boolean, Integer, Float,
-    String, Array, Associative Array, Object (to be implemented) or an Atom, Binary,
+    String, Array, Object (treated as a proplist) or an Atom, Binary,
     or Tuple (with the help of Erl.atom(), Erl.binary(), or Erl.tuple(), respectively).
 * <b>Erl.decode(ArrayBuffer)</b> - Decode a binary ArrayBuffer into a Javascript object.
 * <b>Erl.equals(Obj1, Obj2)</b> - Compare Obj1 and Obj2 for equality.
