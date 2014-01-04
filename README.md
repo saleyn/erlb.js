@@ -1,17 +1,14 @@
-erlb.js
-=======
+# erlb.js #
 
 Javascript binary support of Erlang External Term Format (ETF)
 
-Installation
-------------
+## Installation ##
 
 git clone https://github.com/saleyn/erlb.js.git
 
 Include erlb.js to your project.
 
-Interface
----------
+## Interface ##
 
 * <b>Erl.encode(Object)</b> - Encode a Javascript object into ETF, return ArrayBuffer
     suitable for sending via websocket. The object can be a Boolean, Integer, Float,
@@ -34,8 +31,7 @@ The library natively understands the following Javascript types:
 * Array (Erlang list)
 * Object (Erlang proplists)
 
-Utility Functions
------------------
+### Utility Functions ###
 
 * <b>Erl.toArrayBuffer(Array)</b> - Convert array of bytes to a binary buffer.
 * <b>Erl.bufferToArray(ArrayBuffer)</b> - Convert a binary buffer to an array of bytes.
@@ -44,8 +40,7 @@ Utility Functions
 * <b>Erl.dateToTuple(Date)</b> - Convert a Javascript Date to
     {MegaSec, Sec, MicroSec} tuple.
 
-Testing
--------
+## Testing ##
 
 You can use provided bin/simple_http_server to serve the content of the current directory
 to a web browser:
@@ -56,12 +51,10 @@ $ bin/simple_http_server 8000
 Point your browser to http://localhost:8000/erlb-test.html.
 The page automatically runs all unit tests defined in the erlb-test.js script.
 
-Author
-------
+## Author ##
 
 Serge Aleynikov &lt;saleyn at gmail dot com&gt;
 
-License
--------
+## License ##
 
 BSD License (see included LICENSE file)
