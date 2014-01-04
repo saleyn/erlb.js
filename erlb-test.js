@@ -1,3 +1,10 @@
+// erlb-test.js
+// ============
+// Copyright (c) 2013 Serge Aleynikov <saleyn@gmail.com>
+// See BSD for licensing information.
+//
+// Test cases for erlb.js
+
 function erlb_test() {
     function doTest(msg, actual, expected) {
         ok(Erl.encode(actual).equals(expected), "Encode " + msg);
@@ -6,6 +13,7 @@ function erlb_test() {
 
     doTest("string",        "abcd",             [131,107,0,4,97,98,99,100]);
     doTest("atom",          Erl.atom("hello"),  [131,100,0,5,104,101,108,108,111]);
+    doTest("undefined",     undefined,          [131,100,0,9,117,110,100,101,102,105,110,101,100]);
     doTest("bool(true)",    true,               [131,100,0,4,116,114,117,101]);
     doTest("bool(false)",   false,              [131,100,0,5,102,97,108,115,101]);
     doTest("int(0)",        0,                  [131,97,0]);
@@ -17,12 +25,18 @@ function erlb_test() {
     doTest("float(-1.5e-3)",-1.5e-3,            [131,70,191,88,147,116,188,106,126,250]);
     doTest("pid", Erl.pid("a@b",48,0,0),        [131,103,100,0,3,97,64,98,0,0,0,48,0,0,0,0,0]);
     doTest("ref", Erl.ref("a@b",0,[154,1,2]),   [131,114,0,3,100,0,3,97,64,98,0,0,0,0,154,0,0,0,1,0,0,0,2]);
+    doTest("binary", Erl.binary([1,2,3,4]),     [131,109,0,0,0,4,1,2,3,4]);
     doTest('tuple{1,"a",3.1}', Erl.tuple(1,"a",3.1), [131,104,3,97,1,107,0,1,97,70,64,8,204,204,204,204,204,205]);
     doTest('list[]',        [],                 [131,106]);
     doTest('list[1,"a",3.1]', [1,"a",3.1],      [131,108,0,0,0,3,97,1,107,0,1,97,70,64,8,204,204,204,204,
                                                  204,205,106]);
-    doTest("tuple{1,\"a\",{'x',23,[]},true}", Erl.tuple(1,"a",Erl.tuple(Erl.atom('x'),23,[]),true),
+    doTest("tuple{1,\"a\",{'x',23,[]},true}",
+        Erl.tuple(1,"a",Erl.tuple(Erl.atom('x'),23,[]),true),
                                                 [131,104,4,97,1,107,0,1,97,104,3,100,0,1,120,97,23,106,
                                                  100,0,4,116,114,117,101]);
-
+    doTest('proplist[{a,1},{b,[1,"a"]},{c,[]},{d,10.1},{e,"abc"}]',
+        {a:1, b:[1,"a"], c:[], d:10.1, e:"abc"},[131,108,0,0,0,5,104,2,100,0,1,97,97,1,104,2,100,0,1,98,
+                                                 108,0,0,0,2,97,1,107,0,1,97,106,104,2,100,0,1,99,106,104,
+                                                 2,100,0,1,100,70,64,36,51,51,51,51,51,51,104,2,100,0,1,101,
+                                                 107,0,3,97,98,99,106]);
 }
