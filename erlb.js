@@ -525,28 +525,29 @@ Erl.prototype.decode_inner = function (Obj) {
 Erl.prototype.decode_atom = function (Obj) {
     var DV = Obj.data;
     var Offset = Obj.offset;
-    var N, Type = DV.getUint8(Offset++);
+    var n, Type = DV.getUint8(Offset++);
     switch (Type) {
         case this.Enum.ATOM:
-            N = DV.getUint16(Offset); Offset += 2;
+            n = DV.getUint16(Offset); Offset += 2;
             break;
         case this.Enum.SMALL_ATOM:
-            N = DV.getUint8(Offset++);
+            n = DV.getUint8(Offset++);
             break;
         default:
             throw new Error("Invalid Erlang atom: " +
                             Type + " at offset " + Offset);
     }
-    var A = new Uint8Array(DV.buffer, Offset, N);
-    Offset += N;
-    var S = String.fromCharCode.apply(String, A);
-    if (S === "true")
-        V = true;
-    else if (S === "false")
-        V = false;
+    var A = new Uint8Array(DV.buffer, Offset, n);
+    Offset += n;
+    var s = String.fromCharCode.apply(String, A);
+    var v;
+    if (s === "true")
+        v = true;
+    else if (s === "false")
+        v = false;
     else
-        V = this.atom(S);
-    return { value: V, offset: Offset };
+        v = this.atom(s);
+    return { value: v, offset: Offset };
 };
 
 Erl.prototype.decode_binary = function (Obj) {
