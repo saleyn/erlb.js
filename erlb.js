@@ -306,6 +306,8 @@ Erl.prototype.encode_size = function (Obj) {
         case "boolean":     return Obj ? 7 : 8; // Atom "true" or "false"
         case "undefined":   return this.atom("undefined").encodeSize();
     }
+    if (Obj === null)
+        return this.atom("null").encodeSize();
     switch (Obj.type) {
         case "atom":        return Obj.encodeSize();
         case "tuple":       return this.encode_tuple_size(Obj);
@@ -325,7 +327,7 @@ Erl.prototype.encode_inner = function (Obj, dataView, Offset) {
 
 Erl.prototype.encode_object = function (Obj, DV, Offset) {
     if (Obj === null)
-        return this.encode_inner(this.atom("null"));
+        return this.encode_inner(this.atom("null"), DV, Offset);
 
     switch (Obj.type) {
         case "atom":    return this.encode_atom(Obj, DV, Offset);
@@ -583,6 +585,7 @@ Erl.prototype.decode_atom = function (Obj) {
         case "true":        v = true; break;
         case "false":       v = false; break;
         case "undefined":   v = undefined; break;
+        case "null":        v = null; break;
         default:            v = this.atom(s);
     }
     return { value: v, offset: Offset };

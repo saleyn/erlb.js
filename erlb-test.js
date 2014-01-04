@@ -14,6 +14,7 @@ function erlb_test() {
     doTest("string",        "abcd",             [131,107,0,4,97,98,99,100]);
     doTest("atom",          Erl.atom("hello"),  [131,100,0,5,104,101,108,108,111]);
     doTest("undefined",     undefined,          [131,100,0,9,117,110,100,101,102,105,110,101,100]);
+    doTest("null",          null,               [131,100,0,4,110,117,108,108]);
     doTest("bool(true)",    true,               [131,100,0,4,116,114,117,101]);
     doTest("bool(false)",   false,              [131,100,0,5,102,97,108,115,101]);
     doTest("int(0)",        0,                  [131,97,0]);
