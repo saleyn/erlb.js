@@ -19,11 +19,20 @@ Interface
     or Tuple (with the help of Erl.atom(), Erl.binary(), or Erl.tuple(), respectively).
 * <b>Erl.decode(ArrayBuffer)</b> - Decode a binary ArrayBuffer into a Javascript object.
 * <b>Erl.equals(Obj1, Obj2)</b> - Compare Obj1 and Obj2 for equality.
+* <b>Erl.toString(Obj)</b> - Print a Javascript object in the Erlang notation.
 * <b>Erl.atom(String)</b> - Create a Javascript object that will be encoded to an Atom.
 * <b>Erl.binary(Int8Array)</b> - Create a Javascript object that will be encoded to an Binary.
 * <b>Erl.tuple(Array)</b> - Create a Javascript object that will be encoded to a Tuple.
 * <b>Erl.pid(Node, Id, Ser, Creation)</b> - Create a Javascript object that will be encoded to a Pid.
 * <b>Erl.ref(Node, Creation, IDs)</b> - Create a Javascript object that will be encoded to a Ref.
+
+The library natively understands the following Javascript types:
+
+* Number (integer, float)
+* String
+* Boolean
+* Array (Erlang list)
+* Object (Erlang proplists)
 
 Testing
 -------
