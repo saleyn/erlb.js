@@ -40,7 +40,7 @@ The page automatically runs all unit tests defined in the erlb-test.js script.
 Author
 ------
 
-Serge Aleynikov <saleyn at gmail dot com>
+Serge Aleynikov <saleyn@gmail.com>
 
 License
 -------
