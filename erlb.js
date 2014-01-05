@@ -719,7 +719,7 @@ Erl.prototype.decode_list = function (Obj) {
                 Offset++;
             // Check if the list is an associative array
             if (r.every(function(e) {
-                    return e.type === 'tuple' && e.length === 2 && e.value[0] instanceof ErlAtom; })
+                    return e instanceof ErlTuple && e.length === 2 && e.value[0] instanceof ErlAtom; })
             ) {
                 // Try to convert the associative array to an object
                 var b = true;
