@@ -46,7 +46,7 @@ ErlAtom.prototype.toString      = function() {
 
 
 function ErlBinary(Arr) {
-    if (!Arr instanceof Array)
+    if (!(Arr instanceof Array))
         throw new Error("Unsupported binary data type: " + Erl.getClassName(Arr));
     this.value = Arr;
 }
@@ -92,7 +92,7 @@ ErlTuple.prototype.toTimestamp  = function() {
 function ErlPid(Node, Id, Serial, Creation) {
     if (typeof(Node) === 'string')
         Node = new ErlAtom(Node);
-    else if (!Node instanceof ErlAtom)
+    else if (!(Node instanceof ErlAtom))
         throw new Error("Node argument must be an atom!");
 
     this.node = Node;
@@ -115,7 +115,7 @@ ErlPid.prototype.toString       = function() {
 function ErlRef(Node, Creation, IDs) {
     if (typeof(Node) === 'string')
         Node = new ErlAtom(Node);
-    else if (!Node instanceof ErlAtom)
+    else if (!(Node instanceof ErlAtom))
         throw new Error("Node argument must be an atom!");
     if (!(IDs instanceof Array) || IDs.length > 3)
         throw new Error("Reference IDs must be an array of length <= 3!");
@@ -211,8 +211,8 @@ Erl.prototype.equals = function () {
     if (a instanceof Object != b instanceof Object)
         return false;
 
-    for (var k in a) if (!k in b) return false;
-    for (var k in b) if (!k in a) return false;
+    for (var k in a) if (!(k in b)) return false;
+    for (var k in b) if (!(k in a)) return false;
     for (var k in a) {
         var av = a[k];
         var bv = b[k];
