@@ -20,7 +20,7 @@ function Erl() {}
 function ErlObject() {}
 ErlObject.prototype.type        = 'erl';
 ErlObject.prototype.toString    = function() { return this.type; };
-ErlObject.prototype.extend      = function (Child, Type) {
+ErlObject.prototype.extend      = function(Child, Type) {
     var F = function(){};
     F.prototype = ErlObject.prototype;
     Child.prototype = new F();
@@ -46,16 +46,9 @@ ErlAtom.prototype.toString      = function() {
 
 
 function ErlBinary(Arr) {
-    if (Arr instanceof Array)
-        this.value = Arr;
-    else if (Arr instanceof ArrayBuffer)
-        this.value = new Uint8Array(Arr);
-    else if (Arr instanceof Uint8Array)
-        this.value = Arr;
-    else if (Arr instanceof Int8Array)
-        this.value = Arr;
-    else
+    if (!Arr instanceof Array)
         throw new Error("Unsupported binary data type: " + Erl.getClassName(Arr));
+    this.value = Arr;
 }
 ErlObject.prototype.extend(ErlBinary, 'binary');
 ErlBinary.prototype.equals      = function(a) {
@@ -63,20 +56,12 @@ ErlBinary.prototype.equals      = function(a) {
     };
 ErlBinary.prototype.encodeSize  = function() { return 1 + 4 + this.value.length; };
 ErlBinary.prototype.toString    = function() {
-        var n = 0;
         var a = this.value;
-        for (var i=0, m=a.length; i < m; ++i, ++n) {
-            var c = a[i];
-            if (c < 31 || c > 126)
-                 break;
-        }
-        var printable = a.length > 0 && n === a.length;
         var s = "<<";
-        if (printable) s += '"';
-        if (a.length)  s += a[0];
-        for (var i=1, m=a.length; i < m; ++i)
-            s += ',' + a[i];
-        return s + (printable ? '">>' : '>>');
+        var printable = a.length > 0 && a.every(function(i) { return i > 30 && i < 127; });
+        return printable
+            ? '<<"' + a.map(function(i) { return String.fromCharCode(i); }).join('') + '">>'
+            : '<<' + a.join(',') + '>>';
     };
 
 function ErlTuple(Arr) {
@@ -88,11 +73,9 @@ ErlTuple.prototype.equals       = function(a) {
         return a instanceof ErlTuple && this.value.equals(a.value);
     };
 ErlTuple.prototype.encodeSize   = function() {
-        var k = this.length;
-        var n = 1 + (k < 256 ? 1 : 4);
-        for (var i = 0; i < k; i++)
-            n += Erl.encode_size(this.value[i]);
-        return n;
+        return this.value.reduce(
+            function(s,i) { return s + Erl.encode_size(i); },
+            1 + (this.length < 256 ? 1 : 4));
     };
 ErlTuple.prototype.toString     = function() {
         var s = "{" + this.value.map(function(e) { return Erl.toString(e);}).join(',');
@@ -151,11 +134,7 @@ ErlRef.prototype.encodeSize     = function() {
     }
 ErlRef.prototype.toString       = function() {
         var s = "#ref{" + this.node.toString() + ", ";
-        var n = this.ids.length;
-        if (n > 0) s += this.ids[0];
-        for (var i=1; i < n; ++i)
-            s += "," + this.ids[i];
-        return s + "}";
+        return s + (this.ids.length ? this.ids.join(',') : '') + '}';
     };
 
 function ErlVar(Name, Type) {
@@ -462,8 +441,7 @@ Erl.prototype.encode_number = function (Obj, DV, Offset) {
 Erl.prototype.encode_float = function (Obj, DV, Offset) {
     DV.setUint8(Offset++, this.Enum.NEW_FLOAT);
     DV.setFloat64(Offset, Obj);
-    Offset += 8;
-    return { data: DV, offset: Offset };
+    return { data: DV, offset: Offset+8 };
 };
 
 Erl.prototype.encode_atom = function (Obj, DV, Offset) {
@@ -494,11 +472,9 @@ Erl.prototype.encode_tuple = function (Obj, DV, Offset) {
         DV.setUint32(Offset, n);
         Offset += 4;
     }
-    for (var i = 0; i < n; i++) {
-        var r = this.encode_inner(Obj.value[i], DV, Offset);
-        Offset = r.offset;
-    }
-    return { data: DV, offset: Offset };
+    return Obj.value.reduce(
+        function(a, e) { return Erl.encode_inner(e, a.data, a.offset); },
+        {data: DV, offset: Offset});
 };
 
 Erl.prototype.encode_pid = function (Obj, DV, Offset) {
@@ -517,29 +493,22 @@ Erl.prototype.encode_ref = function (Obj, DV, Offset) {
     var r = this.encode_atom(Obj.node, DV, Offset);
     Offset = r.offset;
     DV.setUint8(Offset++, this.creation);
-    for (var i=0; i < Obj.ids.length; ++i, Offset += 4)
-        DV.setUint32(Offset, Obj.ids[i]);
+    Offset = Obj.ids.reduce(function(n,i) { DV.setUint32(n, i); return n+4; }, Offset);
     return { data: DV, offset: Offset };
 };
 
 Erl.prototype.encode_array_size = function (Obj) {
-    var n = 1;
-    if (Obj.length > 0) {
-        n += 1 + 4;
-        for (var i = 0, m = Obj.length; i < m; i++)
-            n += this.encode_size(Obj[i]);
-    }
-    return n;
+    return Obj.reduce(function(a,e) { return a + Erl.encode_size(e); }, Obj.length ? 6 : 1)
 };
 
 Erl.prototype.encode_array = function (Obj, DV, Offset) {
     if (Obj.length > 0) {
         DV.setUint8(Offset++, this.Enum.LIST);
         DV.setUint32(Offset, Obj.length); Offset += 4;
-        for (var i = 0, n = Obj.length; i < n; i++) {
-            var r = this.encode_inner(Obj[i], DV, Offset);
-            Offset = r.offset;
-        }
+        Offset = Obj.reduce(
+            function(n,e) { var r = Erl.encode_inner(e, DV, n); return r.offset; },
+            Offset
+        );
     }
     DV.setUint8(Offset++, this.Enum.NIL);
     return { data: DV, offset: Offset };
@@ -739,24 +708,21 @@ Erl.prototype.decode_list = function (Obj) {
         case this.Enum.LIST:
             n = DV.getUint32(Offset);
             Obj.offset = Offset + 4;
-            r = [];
+            r = new Array(n);
             for (var i = 0; i < n; ++i) {
-                var Res = this.decode_inner(Obj);
-                r.push(Res.value);
+                var Res = Erl.decode_inner(Obj);
+                r[i] = Res.value;
                 Obj.offset = Res.offset;
             }
             Offset = Obj.offset;
             if (DV.byteLength > Offset && DV.getUint8(Offset) === this.Enum.NIL)
                 Offset++;
             // Check if the list is an associative array
-            var b = true;
-            for (var i = 0; i < n; ++i)
-                if (r[i].type !== "tuple" || r[i].length !== 2 || r[i].value[0].type !== "atom") {
-                    b = false;
-                    break;
-                }
-            if (b) {
+            if (r.every(function(e) {
+                    return e.type === 'tuple' && e.length === 2 && e.value[0] instanceof ErlAtom; })
+            ) {
                 // Try to convert the associative array to an object
+                var b = true;
                 var out = {};
                 for (var i=0; i < n; ++i) {
                     var e = r[i];
@@ -799,10 +765,10 @@ Erl.prototype.decode_tuple = function (Obj) {
             throw new Error("Invalid Erlang tuple type: " +
                             Type + " at offset " + Offset);
     }
-    var r = [];
+    var r = new Array(n);
     for (var i = 0; i < n; i++) {
-        var res = this.decode_inner(Obj);
-        r.push(res.value);
+        var res = Erl.decode_inner(Obj);
+        r[i] = res.value;
         Obj.offset = res.offset;
     }
     return { value: this.tuple.apply(this, r), offset: Obj.offset };

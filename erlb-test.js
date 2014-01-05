@@ -45,8 +45,10 @@ function erlb_test() {
 
     // -- Test stringification --
     equal(Erl.toString("abc"),                  '"abc"',        'Erl.toString("abc")');
-    equal(Erl.toString(Erl.atom("abc")),        "abc",          "Erl.toString(ErlAtom)");
-    equal(Erl.toString(Erl.binary([1,2,3])),    "<<1,2,3>>",    "Erl.toString(ErlBinary)");
+    equal(Erl.toString(Erl.atom("abc")),        "abc",          "Erl.toString(ErlAtom(abc))");
+    equal(Erl.toString(Erl.atom("Xy")),         "'Xy'",         "Erl.toString(ErlAtom('Xy'))");
+    equal(Erl.toString(Erl.binary([1,2,3])),    "<<1,2,3>>",    "Erl.toString(ErlBinary(<<1,2,3>>))");
+    equal(Erl.toString(Erl.binary([65,66,67])), '<<"ABC">>',    'Erl.toString(ErlBinary(<<"ABC">>)');
     equal(Erl.toString(undefined),              "undefined",    "Erl.toString(undefined)");
     equal(Erl.toString(null),                   "null",         "Erl.toString(null)");
     equal(Erl.toString(true),                   "true",         "Erl.toString(Boolean)");
