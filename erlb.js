@@ -6,7 +6,7 @@
 // but ended up being a rewrite.
 
 // erlb.js is a Javascript implementation of Erlang Binary External Term Format.
-// http://github.com/erlb.js
+// http://github.com/saleyn/erlb.js
 //
 // For future integration:
 // BigInteger: https://github.com/silentmatt/javascript-biginteger
