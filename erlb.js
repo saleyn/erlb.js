@@ -54,7 +54,7 @@ ErlBinary.prototype.toString    = function()  {
     const printable = a.length > 0 && a.every((i) => i > 30 && i < 127);
     const body = printable ? a.map(i => String.fromCharCode(i)).join('') : a.join(',');
     return `<<${printable ? '"':''}${body}${printable ? '"':''}>>`
-};
+}
 
 function ErlTuple(arr) {
     this.value  = arr;
@@ -66,6 +66,7 @@ ErlTuple.prototype.encodeSize   = function()  {
     return this.value.reduce(
         (s,i) => s + Erl.encode_size(i),
         1 + (this.length < 256 ? 1 : 4));
+}
 ErlTuple.prototype.toString     = function() {
     return "{" + this.value.map((e) => Erl.toString(e)).join(',') + "}";
 }
@@ -74,7 +75,7 @@ ErlTuple.prototype.toTimestamp  = function() {
     if (length !== 3) return -1;
     const n = value[0] * 1000000000 + value[1] * 1000 + value[2] / 1000;
     return isNaN(n) ? -1 : n;
-};
+}
 
 
 function ErlMap(obj) {
@@ -148,8 +149,8 @@ function ErlVar(Name, type) {
 }
 ErlObject.prototype.extend(ErlVar, 'binary');
 ErlVar.prototype.equals     = function(a) { return false;
-ErlVar.prototype.encodeSize = ()  => { throw new Error("Cannot encode variables!"); }
-ErlVar.prototype.toString   = function()  => {
+ErlVar.prototype.encodeSize = function()  { throw new Error("Cannot encode variables!"); }
+ErlVar.prototype.toString   = function()  {
     let tp;
     switch (this.valueType) {
         case Erl.Enum.ATOM:        tp = "::atom()";    break;
@@ -168,7 +169,7 @@ ErlVar.prototype.toString   = function()  => {
         default:                   tp = "";            break;
     }
     return this.name + tp;
-};
+}
 
 //-----------------------------------------------------------------------------
 // - INTERFACE -
@@ -183,7 +184,7 @@ Erl.prototype.encode = function (obj) {
     if (v.offset !== n)
         throw new Error("Invalid size of encoded buffer: " + v.offset + " expected: " + n);
     return b;
-};
+}
 
 Erl.prototype.decode = function (buffer) {
     var dv = new DataView(buffer, 0);
@@ -196,7 +197,7 @@ Erl.prototype.decode = function (buffer) {
                         buffer.byteLength - obj.offset + " bytes");
     }
     return obj.value;
-};
+}
 
 Erl.prototype.equals = function () {
     var a = arguments[0];
@@ -228,23 +229,21 @@ Erl.prototype.equals = function () {
 }
 
 Erl.prototype.toString = function(obj) {
-    if (obj === undefined)  return "undefined";
-    if (obj === null)       return "null";
+    if (obj === undefined) return "undefined";
+    if (obj === null)      return "null";
 
     switch (typeof(obj)) {
         case 'number':  return obj.toString();
         case 'boolean': return obj.toString();
-        case 'string':  return '"' + obj.toString() + '"';
+        case 'string':  return `"${obj.toString()}"`;
     }
     if (ErlObject.prototype.isPrototypeOf(obj))
         return obj.toString();
-    if (obj instanceof Array) {
-        return '[' + obj.map((e) => Erl.toString(e)).join(",") + ']';
-    }
+    if (obj instanceof Array)
+        return `[${obj.map((e) => Erl.toString(e)).join(",")}]`;
 
-    return '['
-        + Object.keys(obj).map((k) => `{${k},${Erl.toString(obj[k])}}`).join(",")
-        + ']';
+    const body = Object.keys(obj).map((k) => `{${k},${Erl.toString(obj[k])}}`).join(",");
+    return `[${body}]`;
 }
 
 Erl.prototype.atom   = function(obj) { return new ErlAtom(obj);   }
@@ -254,7 +253,7 @@ Erl.prototype.tuple  = function()    {
     for (let i=0, n = arguments.length; i < n; ++i)
         a[i] = arguments[i];
     return new ErlTuple(a);
-};
+}
 
 Erl.prototype.pid = function(Node, Id, Serial, creation) { return new ErlPid(Node, Id, Serial, creation); }
 Erl.prototype.ref = function(Node, creation, IDs)        { return new ErlRef(Node, creation, IDs); }
@@ -343,12 +342,12 @@ Erl.prototype.encode_size = function(obj) {
     var s = this.getClassName(obj);
     return s.indexOf("Array") < 0
         ? this.encode_assoc_array_size(obj) : this.encode_array_size(obj);
-};
+}
 
 Erl.prototype.encode_inner = function(obj, dataView, offset) {
     const func = 'encode_' + (obj instanceof Object ? 'map' : typeof(obj));
     return this[func](obj, dataView, offset);
-};
+}
 
 Erl.prototype.encode_object = function(obj, dv, offset) {
     if (obj === null)
@@ -368,7 +367,7 @@ Erl.prototype.encode_object = function(obj, dv, offset) {
 
     // Treat the object as an associative array
     return this.encode_assoc_array(obj, dv, offset);
-};
+}
 
 Erl.prototype.encode_undefined = function(obj, dv, offset) {
     return this.encode_atom(this.atom("undefined"), dv, offset);
@@ -384,7 +383,7 @@ Erl.prototype.encode_string = function(obj, dv, offset) {
     for (let i = 0, n = obj.length; i < n; ++i)
         dv.setUint8(offset++, obj.charCodeAt(i));
     return { data: dv, offset: offset };
-};
+}
 
 Erl.prototype.encode_boolean = function(obj, dv, offset) {
     return this.encode_atom(new ErlAtom(obj ? "true" : "false"), dv, offset);
@@ -408,7 +407,7 @@ Erl.prototype.encode_number_size = function(obj) {
     for (; obj; ++n, obj = Math.floor(obj / 256));
 
     return 1 + 2 + n;
-};
+}
 
 Erl.prototype.encode_number = function(obj, dv, offset) {
     /* assuming that obj is numeric, otherwise need to check that: obj === +obj */
@@ -444,13 +443,13 @@ Erl.prototype.encode_number = function(obj, dv, offset) {
     dv.setUint8(pos++, code);
     dv.setUint8(pos, n);
     return { data: dv, offset: offset };
-};
+}
 
 Erl.prototype.encode_float = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.NEW_FLOAT);
     dv.setFloat64(offset, obj);
     return { data: dv, offset: offset+8 };
-};
+}
 
 Erl.prototype.encode_atom = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.ATOM);
@@ -459,7 +458,7 @@ Erl.prototype.encode_atom = function(obj, dv, offset) {
     for (let i = 0, n = obj.value.length; i < n; ++i)
         dv.setUint8(offset++, obj.value.charCodeAt(i));
     return { data: dv, offset: offset };
-};
+}
 
 Erl.prototype.encode_binary = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.BINARY);
@@ -468,7 +467,7 @@ Erl.prototype.encode_binary = function(obj, dv, offset) {
     for (let i = 0, n = obj.value.length; i < n; ++i)
         dv.setUint8(offset++, obj.value[i]);
     return { data: dv, offset: offset };
-};
+}
 
 Erl.prototype.encode_tuple = function(obj, dv, offset) {
     var n = obj.length;
@@ -483,7 +482,7 @@ Erl.prototype.encode_tuple = function(obj, dv, offset) {
     return obj.value.reduce(
         (a, e) => Erl.encode_inner(e, a.data, a.offset),
         {data: dv, offset: offset});
-};
+}
 
 Erl.prototype.encode_pid = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.PID);
@@ -493,7 +492,7 @@ Erl.prototype.encode_pid = function(obj, dv, offset) {
     dv.setUint32(offset,  (obj.num >>  2) & 0x1fff); offset += 4;
     dv.setUint8 (offset++,(obj.num & 0x3));
     return { data: dv, offset: offset };
-};
+}
 
 Erl.prototype.encode_ref = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.NEW_REFERENCE);
@@ -503,7 +502,7 @@ Erl.prototype.encode_ref = function(obj, dv, offset) {
     dv.setUint8(offset++, this.creation);
     offset = obj.ids.reduce((n,i) => { dv.setUint32(n, i); return n+4; }, offset);
     return { data: dv, offset: offset };
-};
+}
 
 Erl.prototype.encode_map = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.MAP);
@@ -534,7 +533,7 @@ Erl.prototype.encode_array = function(obj, dv, offset) {
     }
     dv.setUint8(offset++, this.Enum.NIL);
     return { data: dv, offset: offset };
-};
+}
 
 Erl.prototype.encode_assoc_array_size = function(obj) {
     var n = 6 /* list begin/end */;
@@ -552,7 +551,7 @@ Erl.prototype.encode_assoc_array = function(obj, dv, offset) {
         if (obj.hasOwnProperty(key))
             arr.push(this.tuple(this.atom(key), obj[key]));
     return this.encode_array(arr, dv, offset);
-};
+}
 
 //-----------------------------------------------------------------------------
 // - DECODING -
@@ -582,7 +581,7 @@ Erl.prototype.decode_inner = function(obj) {
         default: throw new Error("Unexpected Erlang type: " +
                                 type + " at offset " + obj.offset);
     }
-};
+}
 
 Erl.prototype.decode_atom = function(obj) {
     var dv = obj.data;
@@ -611,7 +610,7 @@ Erl.prototype.decode_atom = function(obj) {
         default:          v = this.atom(s);
     }
     return { value: v, offset: offset };
-};
+}
 
 Erl.prototype.decode_binary = function(obj) {
     var dv = obj.data;
@@ -623,7 +622,7 @@ Erl.prototype.decode_binary = function(obj) {
     var a = new Array(n);
     for (let i=offset, j=0, m = offset+n; i < m; ++i, ++j) a[j] = dv.getUint8(i);
     return { value: this.binary(a), offset: offset+n };
-};
+}
 
 Erl.prototype.decode_integer = function(obj) {
     var dv = obj.data;
@@ -660,7 +659,7 @@ Erl.prototype.decode_integer = function(obj) {
     }
 
     return { value: v, offset: offset };
-};
+}
 
 Erl.prototype.decode_float = function(obj) {
     var dv = obj.data;
@@ -683,7 +682,7 @@ Erl.prototype.decode_float = function(obj) {
                             type + " at offset " + offset);
     }
     return { value: v, offset: offset };
-};
+}
 
 Erl.prototype.decode_string = function(obj) {
     var dv = obj.data;
@@ -715,7 +714,7 @@ Erl.prototype.decode_string = function(obj) {
                             type + " at offset " + offset);
     }
     return { value: s, offset: offset };
-};
+}
 
 Erl.prototype.decode_list = function(obj) {
     var dv        = obj.data;
@@ -767,7 +766,7 @@ Erl.prototype.decode_list = function(obj) {
                             type + " at offset " + offset);
     }
     return { value: r, offset: offset };
-};
+}
 
 Erl.prototype.decode_map = function(obj) {
     const dv     = obj.data;
@@ -812,7 +811,7 @@ Erl.prototype.decode_tuple = function(obj) {
         obj.offset = res.offset;
     }
     return { value: this.tuple.apply(this, r), offset: obj.offset };
-};
+}
 
 Erl.prototype.decode_pid = function(obj) {
     var dv     = obj.data;
@@ -984,5 +983,4 @@ Object.prototype.deepClone = function(obj, override = undefined, filterKeys = ()
     doMerge(res, override, [])
     return res
 }
-
 
