@@ -340,8 +340,8 @@ Erl.prototype.encode_size = function(obj) {
         case "map":         return obj.encodeSize();
     }
     var s = this.getClassName(obj);
-    return s.indexOf("Array") < 0
-        ? this.encode_assoc_array_size(obj) : this.encode_array_size(obj);
+    return Array.isArray(obj) || s.indexOf("Array") >= 0
+        ? this.encode_array_size(obj) : this.encode_assoc_array_size(obj);
 }
 
 Erl.prototype.encode_inner = function(obj, dataView, offset) {
@@ -367,7 +367,7 @@ Erl.prototype.encode_object = function(obj, dv, offset) {
     }
 
     var s = this.getClassName(obj);
-    if (s.indexOf("Array") != -1)   return this.encode_array(obj, dv, offset);
+    if (Array.isArray(obj) || s.indexOf("Array") != -1)   return this.encode_array(obj, dv, offset);
 
     // Treat the object as an associative array
     return this.encode_assoc_array(obj, dv, offset);
