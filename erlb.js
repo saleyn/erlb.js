@@ -77,7 +77,6 @@ ErlTuple.prototype.toTimestamp  = function() {
     return isNaN(n) ? -1 : n;
 }
 
-
 function ErlMap(obj) {
     if (obj instanceof ErlMap)
         this.value = obj.value.deepClone()
@@ -88,7 +87,7 @@ function ErlMap(obj) {
 }
 ErlObject.prototype.extend(ErlMap, 'map');
 ErlMap.prototype.equals = function(a) {
-    return a instanceof ErlTuple && this.value.equals(a.value);
+    return a instanceof ErlMap && this.value.equals(a.value);
 }
 ErlMap.prototype.encodeSize = function() {
     return this.value.reduce((s,i) => s + Erl.encode_size(i), 1 + 4);
@@ -97,15 +96,15 @@ ErlMap.prototype.toString   = function() {
     return "#{" + Object.keys(this.value).map(k => `${k} => ${Erl.toString(this.value[k])}`).join(',') + "}";
 }
 
-function ErlPid(Node, Id, Serial, creation) {
-    if (typeof(Node) === 'string')
-        Node = new ErlAtom(Node);
-    else if (!(Node instanceof ErlAtom))
+function ErlPid(node, id, serial, creation) {
+    if (typeof(node) === 'string')
+        node = new ErlAtom(node);
+    else if (!(node instanceof ErlAtom))
         throw new Error("Node argument must be an atom!");
 
-    this.node = Node;
-    this.num  = (((Id & 0x7fff) << 15)
-              | ((Serial & 0x1fff) << 2)
+    this.node = node;
+    this.num  = (((id & 0x7fff) << 15)
+              | ((serial & 0x1fff) << 2)
               | (creation & 0x3)) & 0x3fffFFFF;
 }
 ErlObject.prototype.extend(ErlPid, 'pid');
@@ -148,7 +147,7 @@ function ErlVar(Name, type) {
     this.name = Name;
 }
 ErlObject.prototype.extend(ErlVar, 'binary');
-ErlVar.prototype.equals     = function(a) { return false;
+ErlVar.prototype.equals     = function(a) { return false; }
 ErlVar.prototype.encodeSize = function()  { throw new Error("Cannot encode variables!"); }
 ErlVar.prototype.toString   = function()  {
     let tp;
@@ -160,6 +159,7 @@ ErlVar.prototype.toString   = function()  {
         case Erl.Enum.ErlDouble:   tp = "::double()";  break;
         case Erl.Enum.ErlLong:     tp = "::int()";     break;
         case Erl.Enum.ErlList:     tp = "::list()";    break;
+        case Erl.Enum.ErlMap:      tp = "::map()";     break;
         case Erl.Enum.ErlPid:      tp = "::pid()";     break;
         case Erl.Enum.ErlPort:     tp = "::port()";    break;
         case Erl.Enum.ErlRef:      tp = "::ref()";     break;
@@ -345,7 +345,11 @@ Erl.prototype.encode_size = function(obj) {
 }
 
 Erl.prototype.encode_inner = function(obj, dataView, offset) {
-    const func = 'encode_' + (obj instanceof Object ? 'map' : typeof(obj));
+    const sufx = obj === undefined || obj === null ? 'undefined'
+               : obj.type ? obj.type
+               : Array.isArray(obj) ? 'array'
+               : typeof(obj);
+    const func = `encode_${sufx}`
     return this[func](obj, dataView, offset);
 }
 
@@ -370,7 +374,9 @@ Erl.prototype.encode_object = function(obj, dv, offset) {
 }
 
 Erl.prototype.encode_undefined = function(obj, dv, offset) {
-    return this.encode_atom(this.atom("undefined"), dv, offset);
+    if (obj !== undefined && obj !== null)
+        throw new Error('Object value must by undefined or null. Found: ' + String(obj));
+    return this.encode_atom(this.atom(String(obj)), dv, offset);
 }
 
 Erl.prototype.encode_string_size = function(obj) {
@@ -410,7 +416,7 @@ Erl.prototype.encode_number_size = function(obj) {
 }
 
 Erl.prototype.encode_number = function(obj, dv, offset) {
-    /* assuming that obj is numeric, otherwise need to check that: obj === +obj */
+    // assuming that obj is numeric, otherwise need to check that: obj === +obj
 
     // Handle floats
     if (!this.isInt(obj)) return this.encode_float(obj, dv, offset);
@@ -508,7 +514,7 @@ Erl.prototype.encode_map = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.MAP);
     let len = 0;
     for(let prop in obj.value) if (obj.value.hasOwnProperty(prop)) ++len;
-    dv.setUint32(offset, len);
+    dv.setUint32(offset, len); offset += 4;
     for(let prop in obj.value) {
         const k = this.encode_inner(prop, dv, offset)
         const v = this.encode_inner(obj[prop], k.data, k.offset)
@@ -517,6 +523,7 @@ Erl.prototype.encode_map = function(obj, dv, offset) {
     }
     return { data: dv, offset: offset };
 }
+Erl.prototype.encode_object = function(obj, dv, offset) { return this.encode_map(obj, dv, offset); }
 
 Erl.prototype.encode_array_size = function(obj) {
     return obj.reduce((a,e) => a + Erl.encode_size(e), obj.length ? 6 : 1)
@@ -536,10 +543,10 @@ Erl.prototype.encode_array = function(obj, dv, offset) {
 }
 
 Erl.prototype.encode_assoc_array_size = function(obj) {
-    var n = 6 /* list begin/end */;
+    var n = 6; // list begin/end
     for (let key in obj)
         if (obj.hasOwnProperty(key))
-            n += 2 /* tuple */
+            n += 2 // tuple
               + this.atom(key).encodeSize()
               + this.encode_size(obj[key]);
     return n;
@@ -875,20 +882,18 @@ Erl.prototype.dateToTuple = function(d) {
 
 var Erl = new Erl();
 
-/*
 // Override console log to display Erl objects friendly
-(() => {
-    var cl = console.log;
-    console.log = () => {
-        cl.apply(console, [].slice.call(arguments).map((el) => {
-            return typeof el === 'object' // {}.toString.call(el) === '[object Object]'
-                && typeof el.toString === 'function'
-                && el.toString !== Object.prototype.toString ? el.toString() : el;
-        }));
-    };
-    console.oldlog = cl;
-}());
-*/
+//(() => {
+//    var cl = console.log;
+//    console.log = () => {
+//        cl.apply(console, [].slice.call(arguments).map((el) => {
+//            return typeof el === 'object' // {}.toString.call(el) === '[object Object]'
+//                && typeof el.toString === 'function'
+//                && el.toString !== Object.prototype.toString ? el.toString() : el;
+//        }));
+//    };
+//    console.oldlog = cl;
+//}());
 
 // attach the .equals method to Array's prototype to call it on any array
 Array.prototype.equals = function(rhs) {
@@ -983,4 +988,3 @@ Object.prototype.deepClone = function(obj, override = undefined, filterKeys = ()
     doMerge(res, override, [])
     return res
 }
-
