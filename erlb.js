@@ -1,5 +1,3 @@
-// vim:ts=2:sw=2:et
-//
 // erlb.js
 // =======
 // Copyright (c) 2013 Serge Aleynikov <saleyn@gmail.com>
@@ -35,20 +33,23 @@ function ErlAtom(s) { this.value = s; }
 
 ErlObject.prototype.extend(ErlAtom, 'atom');
 ErlAtom.prototype.equals     = function(a) { return a instanceof ErlAtom && this.value === a.value; }
-ErlAtom.prototype.encodeSize = function()  { return 3 + Math.min(255, this.value.length); }
+ErlAtom.prototype.encodeSize = function(a) { return 3 + Math.min(255, (a || this.value).length);    }
 ErlAtom.prototype.toString   = function()  {
     return (!this.value.length || this.value[0] < "a" || this.value[0] > "z")
          ?  "'" + this.value + "'" : this.value;
 }
 
 function ErlBinary(arr) {
-    if (!(arr instanceof Array))
+    if (typeof(arr) === 'string')
+        this.value = Array.from(arr);
+    else if (arr instanceof Array)
+        this.value = arr;
+    else
         throw new Error("Unsupported binary data type: " + Erl.getClassName(arr));
-    this.value = arr;
 }
 ErlObject.prototype.extend(ErlBinary, 'binary');
 ErlBinary.prototype.equals      = function(a) { return a instanceof ErlBinary && this.value.equals(a.value); }
-ErlBinary.prototype.encodeSize  = function()  { return 1 + 4 + this.value.length; }
+ErlBinary.prototype.encodeSize  = function(a) { return 1 + 4 + (a || this.value).length; }
 ErlBinary.prototype.toString    = function()  {
     const a = this.value;
     const printable = a.length > 0 && a.every((i) => i > 30 && i < 127);
@@ -63,9 +64,10 @@ function ErlTuple(arr) {
 ErlObject.prototype.extend(ErlTuple, 'tuple');
 ErlTuple.prototype.equals       = function(a) { return a instanceof ErlTuple && this.value.equals(a.value); }
 ErlTuple.prototype.encodeSize   = function()  {
-    return this.value.reduce(
-        (s,i) => s + Erl.encode_size(i),
-        1 + (this.length < 256 ? 1 : 4));
+    return Erl.encode_tuple_size(this.value);
+    //return this.value.reduce(
+    //    (s,i) => s + Erl.encode_size(i),
+    //    1 + (this.length < 256 ? 1 : 4));
 }
 ErlTuple.prototype.toString     = function() {
     return "{" + this.value.map((e) => Erl.toString(e)).join(',') + "}";
@@ -79,7 +81,7 @@ ErlTuple.prototype.toTimestamp  = function() {
 
 function ErlMap(obj) {
     if (obj instanceof ErlMap)
-        this.value = obj.value.deepClone()
+        this.value = Erl.objectDeepClone(obj.value)
     else if (obj instanceof Object)
         this.value = obj
     else
@@ -87,11 +89,9 @@ function ErlMap(obj) {
 }
 ErlObject.prototype.extend(ErlMap, 'map');
 ErlMap.prototype.equals = function(a) {
-    return a instanceof ErlMap && this.value.equals(a.value);
+    return a instanceof ErlMap && Erl.objectsEqual(this.value, a.value);
 }
-ErlMap.prototype.encodeSize = function() {
-    return this.value.reduce((s,i) => s + Erl.encode_size(i), 1 + 4);
-}
+ErlMap.prototype.encodeSize = function(opts={}) { return Erl.encode_map_size(this.value, opts); }
 ErlMap.prototype.toString   = function() {
     return "#{" + Object.keys(this.value).map(k => `${k} => ${Erl.toString(this.value[k])}`).join(',') + "}";
 }
@@ -139,13 +139,14 @@ ErlRef.prototype.encodeSize = function() {
     return 1 + 2 + this.node.encodeSize() + 4*this.ids.length + 1;
 }
 ErlRef.prototype.toString   = function() {
-    return `"#ref{${this.node.toString() + (this.ids.length ? this.ids.map(i => `,${i}`).join('') : '')}}`;
+    return `#ref{${this.node.toString() + (this.ids.length ? this.ids.map(i => `,${i}`).join('') : '')}}`;
 }
 
 function ErlVar(Name, type) {
     this.valueType = type;
     this.name = Name;
 }
+
 ErlObject.prototype.extend(ErlVar, 'binary');
 ErlVar.prototype.equals     = function(a) { return false; }
 ErlVar.prototype.encodeSize = function()  { throw new Error("Cannot encode variables!"); }
@@ -175,12 +176,12 @@ ErlVar.prototype.toString   = function()  {
 // - INTERFACE -
 //-----------------------------------------------------------------------------
 
-Erl.prototype.encode = function (obj) {
-    var n = 1 + this.encode_size(obj);
+Erl.prototype.encode = function (obj, opts = {}) {
+    var n = 1 + this.encode_size(obj, opts);
     var b = new ArrayBuffer(n);
     var d = new DataView(b)
     d.setUint8(0, this.Enum.VERSION);
-    var v = this.encode_inner(obj, d, 1);
+    var v = this.encode_inner(obj, d, 1, opts);
     if (v.offset !== n)
         throw new Error("Invalid size of encoded buffer: " + v.offset + " expected: " + n);
     return b;
@@ -322,15 +323,14 @@ Erl.prototype.Encoding = {
     UTF8   : 4,
 }
 
-Erl.prototype.encode_size = function(obj) {
+Erl.prototype.encode_size = function(obj, opts = {}) {
+    if (obj === null || obj === undefined)
+        return this.atom(String(obj)).encodeSize();
     switch (typeof(obj)) {
         case "number":      return this.encode_number_size(obj);
         case "string":      return this.encode_string_size(obj);
         case "boolean":     return obj ? 7 : 8; // Atom "true" or "false"
-        case "undefined":   return this.atom("undefined").encodeSize();
     }
-    if (obj === null || obj === undefined)
-        return this.atom(String(obj)).encodeSize();
     switch (obj.type) {
         case "atom":        return obj.encodeSize();
         case "tuple":       return obj.encodeSize();
@@ -339,44 +339,50 @@ Erl.prototype.encode_size = function(obj) {
         case "ref":         return obj.encodeSize();
         case "map":         return obj.encodeSize();
     }
-    var s = this.getClassName(obj);
-    return Array.isArray(obj) || s.indexOf("Array") >= 0
-        ? this.encode_array_size(obj) : this.encode_assoc_array_size(obj);
+    if (obj instanceof Array)
+        return this.is_assoc_array(obj) ? this.encode_assoc_array_size(obj)
+                                        : this.encode_array_size(obj)
+    if (obj instanceof Object)
+        return Erl.encode_map_size(obj, opts);
+    throw new Error(`Cannot determine type of object: ${JSON.stringify(obj)}`)
 }
 
-Erl.prototype.encode_inner = function(obj, dataView, offset) {
-    const sufx = obj === undefined || obj === null ? 'undefined'
-               : obj.type ? obj.type
-               : Array.isArray(obj) ? 'array'
-               : typeof(obj);
-    const func = `encode_${sufx}`
-    return this[func](obj, dataView, offset);
-}
+Erl.prototype.encode_inner = function (obj, dataView, offset, opts = {}) {
+    let sfx = (obj instanceof Array)
+            ? (this.is_assoc_array(obj) ? 'assoc_array' : 'array')
+            : typeof(obj);
+    var fun = 'encode_' + sfx;
+    return this[fun](obj, dataView, offset, opts);
+};
 
-Erl.prototype.encode_object = function(obj, dv, offset) {
-    if (obj === null)
-        return this.encode_inner(this.atom("null"), dv, offset);
+Erl.prototype.encode_object = function(obj, dv, offset, opts = {}) {
+    if (obj === null || obj === undefined)
+        return this.encode_atom(String(obj), dv, offset);
 
     switch (obj.type) {
-        case "atom":    return this.encode_atom(obj, dv, offset);
-        case "binary":  return this.encode_binary(obj, dv, offset);
+        case "atom":    return this.encode_atom(obj.value, dv, offset);
+        case "binary":  return this.encode_binary(obj.value, dv, offset);
         case "tuple":   return this.encode_tuple(obj, dv, offset);
         case "ref":     return this.encode_ref(obj, dv, offset);
         case "pid":     return this.encode_pid(obj, dv, offset);
-        case "map":     return this.encode_map(obj, dv, offset);
+        case "map":     return this.encode_map(obj, dv, offset, opts);
     }
 
-    var s = this.getClassName(obj);
-    if (Array.isArray(obj) || s.indexOf("Array") != -1)   return this.encode_array(obj, dv, offset);
+    if (Erl.is_assoc_array(obj))
+        return this.encode_assoc_array(obj, dv, offset);
+    else if (obj instanceof Array)
+        return this.encode_array(obj, dv, offset);
 
-    // Treat the object as an associative array
-    return this.encode_assoc_array(obj, dv, offset);
+    //var s = this.getClassName(obj);
+    //if (Array.isArray(obj) || s.indexOf("Array") != -1)   return this.encode_array(obj, dv, offset);
+    // Treat it as a tuple
+    return this.encode_tuple_or_map(obj, dv, offset, opts);
 }
 
 Erl.prototype.encode_undefined = function(obj, dv, offset) {
     if (obj !== undefined && obj !== null)
         throw new Error('Object value must by undefined or null. Found: ' + String(obj));
-    return this.encode_atom(this.atom(String(obj)), dv, offset);
+    return this.encode_atom(String(obj), dv, offset);
 }
 
 Erl.prototype.encode_string_size = function(obj) {
@@ -392,7 +398,7 @@ Erl.prototype.encode_string = function(obj, dv, offset) {
 }
 
 Erl.prototype.encode_boolean = function(obj, dv, offset) {
-    return this.encode_atom(new ErlAtom(obj ? "true" : "false"), dv, offset);
+    return this.encode_atom(obj ? "true" : "false", dv, offset);
 }
 
 Erl.prototype.encode_number_size = function(obj) {
@@ -459,40 +465,80 @@ Erl.prototype.encode_float = function(obj, dv, offset) {
 
 Erl.prototype.encode_atom = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.ATOM);
-    dv.setUint16(offset, obj.value.length);
+    dv.setUint16(offset, obj.length);
     offset += 2;
-    for (let i = 0, n = obj.value.length; i < n; ++i)
-        dv.setUint8(offset++, obj.value.charCodeAt(i));
+    for (let i = 0, n = obj.length; i < n; ++i)
+        dv.setUint8(offset++, obj.charCodeAt(i));
     return { data: dv, offset: offset };
 }
 
 Erl.prototype.encode_binary = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.BINARY);
-    dv.setUint32(offset, obj.value.length);
+    dv.setUint32(offset, obj.length);
     offset += 4;
-    for (let i = 0, n = obj.value.length; i < n; ++i)
-        dv.setUint8(offset++, obj.value[i]);
+    if (obj instanceof Array)
+        for (let i = 0, n = obj.length; i < n; ++i)
+            dv.setUint8(offset++, obj[i]);
+    else if (typeof(obj) === 'string')
+        for (let i = 0, n = obj.length; i < n; ++i)
+            dv.setUint8(offset++, obj.charCodeAt(i));
+    else
+        throw new Error(`Invalid ErlBinary data type: ${typeof(obj)}`)
     return { data: dv, offset: offset };
 }
 
-Erl.prototype.encode_tuple = function(obj, dv, offset) {
-    var n = obj.length;
-    if (n < 256) {
-        dv.setUint8(offset++, this.Enum.SMALL_TUPLE);
-        dv.setUint8(offset++, n);
-    } else {
-        dv.setUint8(offset++, this.Enum.LARGE_TUPLE);
-        dv.setUint32(offset, n);
-        offset += 4;
+Erl.prototype.encode_tuple_size = function(obj, dv, offset) {
+    if (obj instanceof Array) {
+        return obj.reduce(
+            (s,i) => s + Erl.encode_size(i),
+            1 + (obj.length < 256 ? 1 : 4));
+    } else if (obj instanceof Object) {
+        let len = 0, sz = 0;
+        for (const p in obj) if (obj.hasOwnProperty(p)) {
+            sz += Erl.encode_size(p) + Erl.encode_size(obj[p]);
+            if (++len > 1)
+                throw new Error(`Invalid size of a tuple that is likely part of a proplist: ${JSON.stringify(obj)}`);
+        }
+        return 1 + (len < 256 ? 1 : 4) + sz;
+    } else
+        throw new Error(`Invalid type of tuple data: ${typeof(obj)}`)
+}
+
+Erl.prototype.encode_tuple_or_map = function(obj, dv, offset, opts = {}) {
+    if (!(obj instanceof ErlTuple) && obj instanceof Object) {
+        let len = 0, out = [];
+        for (const p in obj) if (obj.hasOwnProperty(p)) {
+            out.push(p);
+            out.push(obj[p]);
+            if (++len > 1)
+                return this.encode_map(obj, dv, offset, opts);
+        }
+        obj = new ErlTuple(out);
     }
-    return obj.value.reduce(
-        (a, e) => Erl.encode_inner(e, a.data, a.offset),
-        {data: dv, offset: offset});
+    return this.encode_tuple(obj, dv, offset)
+}
+
+Erl.prototype.encode_tuple = function(obj, dv, offset) {
+    if (obj instanceof ErlTuple) {
+        var n = obj.length;
+        if (n < 256) {
+            dv.setUint8(offset++, this.Enum.SMALL_TUPLE);
+            dv.setUint8(offset++, n);
+        } else {
+            dv.setUint8(offset++, this.Enum.LARGE_TUPLE);
+            dv.setUint32(offset, n);
+            offset += 4;
+        }
+        return obj.value.reduce(
+            (a, e) => Erl.encode_inner(e, a.data, a.offset),
+            {data: dv, offset: offset});
+    } else
+        throw new Error(`Invalid type of tuple object: ${JSON.stringify(obj)}`)
 }
 
 Erl.prototype.encode_pid = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.PID);
-    var r = this.encode_atom(obj.node, dv, offset);
+    var r = this.encode_atom(obj.node.value, dv, offset);
     offset = r.offset;
     dv.setUint32(offset,  (obj.num >> 15) & 0x7fff); offset += 4;
     dv.setUint32(offset,  (obj.num >>  2) & 0x1fff); offset += 4;
@@ -503,27 +549,55 @@ Erl.prototype.encode_pid = function(obj, dv, offset) {
 Erl.prototype.encode_ref = function(obj, dv, offset) {
     dv.setUint8(offset++, this.Enum.NEW_REFERENCE);
     dv.setUint16(offset, obj.ids.length); offset += 2;
-    var r = this.encode_atom(obj.node, dv, offset);
+    var r = this.encode_atom(obj.node.value, dv, offset);
     offset = r.offset;
     dv.setUint8(offset++, this.creation);
     offset = obj.ids.reduce((n,i) => { dv.setUint32(n, i); return n+4; }, offset);
     return { data: dv, offset: offset };
 }
 
-Erl.prototype.encode_map = function(obj, dv, offset) {
+Erl.prototype.encode_map_size = function(obj, opts) {
+    if (!(obj instanceof Object))
+        throw new Error(`Invalid data type for encoding map size: ${typeof(obj)}`);
+    const mapKeyType = opts.mapKeyType || 'binary'
+    const mapAtomKey = mapKeyType == 'atom'
+    const mapBinKey  = mapKeyType == 'binary'
+    const sz = Object.entries(obj).reduce((a,kv) => {
+        const  k  = (typeof(kv[0]) === 'string') ? (mapBinKey  ? ErlBinary.prototype.encodeSize(kv[0]) :
+                                                    mapAtomKey ? ErlAtom.prototype.encodeSize(kv[0])   :
+                                                    this.encode_string_size(kv[0]))
+                  : Erl.encode_size(kv[0]);
+        return a += k + Erl.encode_size(kv[1]);
+    }, 5) // Erl.Enum.MAP + arity
+    return sz;
+}
+
+Erl.prototype.encode_map = function(obj, dv, offset, opts = {}) {
     dv.setUint8(offset++, this.Enum.MAP);
     let len = 0;
-    for(let prop in obj.value) if (obj.value.hasOwnProperty(prop)) ++len;
+    if (obj instanceof ErlMap)
+        obj = obj.value
+    else if (!typeof(obj) == 'object')
+        throw new Error(`ErlMap encoding expects an object, got: ${typeof(obj)}`);
+
+    for(let prop in obj) if (obj.hasOwnProperty(prop)) ++len;
     dv.setUint32(offset, len); offset += 4;
-    for(let prop in obj.value) {
-        const k = this.encode_inner(prop, dv, offset)
-        const v = this.encode_inner(obj[prop], k.data, k.offset)
-        dv      = v.data
-        offset  = v.offset
-    }
-    return { data: dv, offset: offset };
+    const mapKeyType = opts.mapKeyType || 'binary'
+    const mapAtomKey = mapKeyType == 'atom'
+    const mapBinKey  = mapKeyType == 'binary'
+    return Object.entries(obj).reduce((o,kv) => {
+        o = (typeof(kv[0]) === 'string') ? (mapBinKey  ? this.encode_binary(kv[0], o.data, o.offset) :
+                                            mapAtomKey ? this.encode_atom(kv[0],   o.data, o.offset) :
+                                            this.encode_string(kv[0], o.data, o.offset))
+                  : Erl.encode_inner(kv[0], o.data, o.offset);
+        return this.encode_inner(kv[1], o.data, o.offset);
+    }, {data: dv, offset: offset}) // Erl.Enum.MAP + arity
 }
-Erl.prototype.encode_object = function(obj, dv, offset) { return this.encode_map(obj, dv, offset); }
+//Erl.prototype.encode_object = function(obj, dv, offset) { return this.encode_map(obj, dv, offset); }
+
+Erl.prototype.encode_array_size = function(obj) {
+    return obj.reduce((a,e) => a + Erl.encode_size(e), obj.length ? 6 : 1)
+}
 
 Erl.prototype.encode_array_size = function(obj) {
     return obj.reduce((a,e) => a + Erl.encode_size(e), obj.length ? 6 : 1)
@@ -542,23 +616,58 @@ Erl.prototype.encode_array = function(obj, dv, offset) {
     return { data: dv, offset: offset };
 }
 
+Erl.prototype.is_assoc_array = function(obj) {
+    return (obj instanceof Array) &&
+           obj.length > 0 &&
+           obj.every(e => {
+        if (e instanceof ErlTuple && e.length === 2 && e.value[0] instanceof ErlAtom)
+            return true;
+        if (!(e instanceof Object)) return false;
+        const keys = Object.keys(e);
+        if (keys.length !== 1) return false;
+        return keys[0] instanceof ErlAtom || typeof(keys[0]) == 'string';
+    })
+}
+
 Erl.prototype.encode_assoc_array_size = function(obj) {
-    var n = 6; // list begin/end
-    for (let key in obj)
-        if (obj.hasOwnProperty(key))
-            n += 2 // tuple
-              + this.atom(key).encodeSize()
-              + this.encode_size(obj[key]);
-    return n;
+    if (!obj instanceof Array)
+        throw new Error(`Invalid type of data in assoc array: ${typeof(obj)} (expected array)`)
+    const sz = obj.reduce(
+        (a,p) => {
+            let len = 0; let tmp;
+            for (const k in p)
+                if (p.hasOwnProperty(k)) {
+                    if (++len > 1) { tmp = p; break; }
+                    a += 2 // tuple
+                      +  this.atom(k).encodeSize() + this.encode_size(p[k]);
+                }
+            if (len != 1)
+              throw new Error(`Invalid size of tuple inside a proplist: ${JSON.stringify(tmp)}`); 
+            return a;
+        },
+        6 // list begin/end
+    )
+    return sz
 }
 
 Erl.prototype.encode_assoc_array = function(obj, dv, offset) {
-    var arr = [];
-    for (let key in obj)
-        if (obj.hasOwnProperty(key))
-            arr.push(this.tuple(this.atom(key), obj[key]));
-    return this.encode_array(arr, dv, offset);
+    if (!obj instanceof Array)
+        throw new Error(`Invalid type of data in assoc array: ${typeof(obj)} (expected array)`)
+    for (let i=0; i < obj.length; ++i) {
+        let item=obj[i], key, val, len = 0;
+        for (const k in item)
+            if (item.hasOwnProperty(k)) {
+                if (++len > 1) break;
+                key = k;
+                val = item[k];
+            }
+        if (len != 1)
+          throw new Error(`Invalid size of tuple inside a proplist: ${JSON.stringify(item)}`); 
+        obj[i] = this.tuple(this.atom(key), val);
+    }
+    return this.encode_array(obj, dv, offset);
 }
+
 
 //-----------------------------------------------------------------------------
 // - DECODING -
@@ -747,23 +856,14 @@ Erl.prototype.decode_list = function(obj) {
             if (dv.byteLength > offset && dv.getUint8(offset) === this.Enum.NIL)
                 offset++;
             // Check if the list is an associative array
-            if (r.every((e) => e instanceof ErlTuple && e.length === 2 && e.value[0] instanceof ErlAtom)) {
-                // Try to convert the associative array to an object
-                var b = true;
-                var out = {};
-                for (let i=0; i < n; ++i) {
-                    var e = r[i];
-                    var k = e.value[0];
-                    if (k in out) {
-                        // Key already exists
-                        b = false;
-                        break;
-                    }
-                    out[k] = e.value[1];
-                }
-                if (b)
-                    r = out;
-            }
+            //if (this.is_assoc_array(r))
+            //    // Try to convert the associative array to an object
+            //    for (let i=0; i < r.length; ++i)
+            //        if (r[i] instanceof ErlTuple && r[i].length === 2) {
+            //            const k = r[i].value[0], v = r[i].value[1];
+            //            r[i]    = {}
+            //            r[i][k] = v
+            //        }
             break;
         case this.Enum.NIL:
             r = [];
@@ -782,14 +882,20 @@ Erl.prototype.decode_map = function(obj) {
     if (type   !== this.Enum.MAP)
         throw new Error("Invalid map type: " + type);
     const arity  = dv.getUint32(offset);
-    obj.offset  += 4;
+    obj.offset   = offset + 4;
     let res      = {}
     for (let i=0; i < arity; ++i) {
         const key  = Erl.decode_inner(obj);
         obj.offset = key.offset;
         const val  = Erl.decode_inner(obj);
         obj.offset = val.offset;
-        res[key.value] = val.value;
+        const   kv = key.value;
+        const    k = (kv instanceof ErlAtom)   ? kv.value
+                   : (kv instanceof ErlBinary) ? String.fromCharCode.apply(String, kv.value)
+                   : (typeof(kv) === 'string') ? kv
+                   : kv.hasOwnProperty('value')? kv.value
+                   : kv;
+        res[k] = val.value;
     }
     return {value: res, offset: obj.offset};
 }
@@ -858,8 +964,8 @@ Erl.prototype.decode_ref = function(obj) {
 //-----------------------------------------------------------------------------
 
 Erl.prototype.getClassName = function(obj) {
-    var funcNameRegex = /(.{1,}) => \(/;
-    var results = (funcNameRegex).exec(obj.constructor.toString());
+    const funcNameRegex = /(.{1,}) => \(/;
+    const results       = (funcNameRegex).exec(obj.constructor.toString());
     return (results && results.length > 1) ? results[1] : "";
 };
 
@@ -935,33 +1041,33 @@ ArrayBuffer.prototype.equals = function(rhs) {
     return true;
 }
 
-Object.prototype.equals = function(rhs) {
+Erl.objectEquals = function(lhs, rhs) {
     'use strict';
 
-    if (this === null || this === undefined ||
-        rhs  === null || rhs === undefined)               return this === rhs;
-    // after this just checking type of one would be enough
-    if (this.constructor !== rhs.constructor)             return false;
+    if (lhs === null || lhs === undefined ||
+        rhs === null || rhs === undefined)               return lhs === rhs;
+    // after lhs just checking type of one would be enough
+    if (lhs.constructor !== rhs.constructor)             return false;
     // if they are functions, they should exactly refer to same one (because of closures)
-    if (this instanceof Function)                         return this === rhs;
+    if (lhs instanceof Function)                         return lhs === rhs;
     // if they are regexps, they should exactly refer to same one (it is hard to better equality check on current ES)
-    if (this instanceof RegExp)                           return this === rhs;
-    if (this === rhs || this.valueOf() === rhs.valueOf()) return true;
-    if (Array.isArray(this))                              return this.equals(rhs);
+    if (lhs instanceof RegExp)                           return lhs === rhs;
+    if (lhs === rhs || lhs.valueOf() === rhs.valueOf())  return true;
+    if (Array.isArray(lhs))                              return lhs.equals(rhs);
 
     // if they are dates, they must had equal valueOf
-    if (this instanceof Date)                             return false;
+    if (lhs instanceof Date)                             return false;
 
     // if they are strictly equal, they both need to be object at least
-    if (!(this instanceof Object))                        return false;
-    if (!(rhs  instanceof Object))                        return false;
+    if (!(lhs instanceof Object))                        return false;
+    if (!(rhs instanceof Object))                        return false;
 
     // recursive object equality check
-    return Object.keys(rhs) .every(i => this[i] !== undefined) &&
-           Object.keys(this).every(i => objectEquals(this[i], rhs[i]));
+    return Object.keys(rhs).every(i => lhs[i] !== undefined) &&
+           Object.keys(lhs).every(i => objectEquals(lhs[i], rhs[i]));
 }
 
-Object.prototype.deepClone = function(obj, override = undefined, filterKeys = () => true) {
+Erl.objectDeepClone = function(obj, override = undefined, filterKeys = () => true) {
     let res = {}
 
     function doMerge(dst, src, path) {

@@ -7,9 +7,9 @@
 //    http://api.qunitjs.com
 
 function erlb_test() {
-    function doTest(msg, actual, expected) {
-        deepEqual(Erl.bufferToArray(Erl.encode(actual)), expected, "Encode " + msg);
-        deepEqual(Erl.decode(Erl.toArrayBuffer(expected)), actual, "Decode " + msg);
+    function doTest(msg, actual, expected, opts = {}) {
+        deepEqual(Erl.bufferToArray(Erl.encode(actual, opts)), expected, "Encode " + msg);
+        deepEqual(Erl.decode(Erl.toArrayBuffer(expected), opts), actual, "Decode " + msg);
     }
 
     // -- Test encoding --
@@ -39,11 +39,11 @@ function erlb_test() {
                                                  100,0,4,116,114,117,101]);
     doTest('proplist[{a,1},{b,[1,"a"]},{c,[]},{d,10.1},{e,"abc"}]',
         [{a:1},{b:[1,"a"]},{c:[]},{d:10.1},{e:"abc"}],
-                                                [131,108,0,0,0,5,104,2,100,0,1,97,97,1,104,2,100,0,1,98,
-                                                 108,0,0,0,2,97,1,107,0,1,97,106,104,2,100,0,1,99,106,104,
-                                                 2,100,0,1,100,70,64,36,51,51,51,51,51,51,104,2,100,0,1,101,
-                                                 107,0,3,97,98,99,106]);
-    doTest('#map{a=>1, b=>2}', {a:1,b:2},       [131,116,0,0,0,2,100,0,1,97,97,1,100,0,1,98,97,2]);
+                                                [131,108,0,0,0,5,104,2,100,0,1,97,97,1,104,2,100,0,1,98,108,0,0,0,2,97,1,107,
+                                                 0,1,97,106,104,2,100,0,1,99,106,104,2,100,0,1,100,70,64,36,51,51,51,51,51,51,
+                                                 104,2,100,0,1,101,107,0,3,97,98,99,106]);
+    doTest('#map{<<"a">> => 1, <<"b">> => 2}',
+        {a:1,b:2},                              [131,116,0,0,0,2,109,0,0,0,1,97,97,1,109,0,0,0,1,98,97,2]);
 
     // -- Test stringification --
     equal(Erl.toString("abc"),                  '"abc"',        'Erl.toString("abc")');
@@ -57,7 +57,7 @@ function erlb_test() {
     equal(Erl.toString(123456),                 "123456",       "Erl.toString(Int)");
     equal(Erl.toString(123.456),                "123.456",      "Erl.toString(Float)");
     equal(Erl.toString(Erl.pid("a@b",1,2,3)),   "#pid{a@b,1,2}", "Erl.toString(Pid)");
-    equal(Erl.toString(Erl.ref("a@b",0,[1,2,3])),"#ref{a@b, 1,2,3}", "Erl.toString(Ref)");
+    equal(Erl.toString(Erl.ref("a@b",0,[1,2,3])),"#ref{a@b,1,2,3}", "Erl.toString(Ref)");
     equal(Erl.toString(Erl.tuple(1,"abc",[])),  '{1,"abc",[]}', "Erl.toString(ErlTuple)");
     equal(Erl.toString([1,"a",[],Erl.tuple(1,Erl.atom('b'))]), '[1,"a",[],{1,b}]', "Erl.toString(List)");
     equal(Erl.toString({a:1, b:[1,2], c:"abc"}), '[{a,1},{b,[1,2]},{c,"abc"}]', "Erl.toString(PropList)");
