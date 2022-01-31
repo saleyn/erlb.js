@@ -44,6 +44,12 @@ function erlb_test() {
                                                  104,2,100,0,1,101,107,0,3,97,98,99,106]);
     doTest('#map{<<"a">> => 1, <<"b">> => 2}',
         {a:1,b:2},                              [131,116,0,0,0,2,109,0,0,0,1,97,97,1,109,0,0,0,1,98,97,2]);
+    doTest('#map{<<"a">> => 1, <<"b">> => 2}',
+        {a:1,b:2},                              [131,116,0,0,0,2,109,0,0,0,1,97,97,1,109,0,0,0,1,98,97,2], {mapKeyType: 'binary'});
+    doTest('#map{a => 1, b => 2}',
+        {a:1,b:2},                              [131,116,0,0,0,2,100,0,1,97,97,1,100,0,1,98,97,2], {mapKeyType: 'atom'});
+    doTest('#map{"a" => 1, "b" => 2}',
+        {a:1,b:2},                              [131,116,0,0,0,2,107,0,1,97,97,1,107,0,1,98,97,2], {mapKeyType: 'string'});
 
     // -- Test stringification --
     equal(Erl.toString("abc"),                  '"abc"',        'Erl.toString("abc")');
@@ -51,6 +57,8 @@ function erlb_test() {
     equal(Erl.toString(Erl.atom("Xy")),         "'Xy'",         "Erl.toString(ErlAtom('Xy'))");
     equal(Erl.toString(Erl.binary([1,2,3])),    "<<1,2,3>>",    "Erl.toString(ErlBinary(<<1,2,3>>))");
     equal(Erl.toString(Erl.binary([65,66,67])), '<<"ABC">>',    'Erl.toString(ErlBinary(<<"ABC">>)');
+    equal(Erl.toString(Erl.binary([1,2,3]), {compact: true}),    "`1,2,3`",  "Erl.toString(ErlBinary(<<1,2,3>>), {compact: true})");
+    equal(Erl.toString(Erl.binary([65,66,67]), {compact: true}), '`ABC`',    'Erl.toString(ErlBinary(<<"ABC">>), {compact: true}');
     equal(Erl.toString(undefined),              "undefined",    "Erl.toString(undefined)");
     equal(Erl.toString(null),                   "null",         "Erl.toString(null)");
     equal(Erl.toString(true),                   "true",         "Erl.toString(Boolean)");

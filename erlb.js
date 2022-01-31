@@ -50,11 +50,14 @@ function ErlBinary(arr) {
 ErlObject.prototype.extend(ErlBinary, 'binary');
 ErlBinary.prototype.equals      = function(a) { return a instanceof ErlBinary && this.value.equals(a.value); }
 ErlBinary.prototype.encodeSize  = function(a) { return 1 + 4 + (a || this.value).length; }
-ErlBinary.prototype.toString    = function()  {
+ErlBinary.prototype.toString    = function(opts = {})  {
     const a = this.value;
     const printable = a.length > 0 && a.every((i) => i > 30 && i < 127);
     const body = printable ? a.map(i => String.fromCharCode(i)).join('') : a.join(',');
-    return `<<${printable ? '"':''}${body}${printable ? '"':''}>>`
+    const cmp  = opts.compact === true;
+    const beg  = cmp ? "`" : `<<${printable ? '"':''}`
+    const end  = cmp ? "`" : `${printable ? '"':''}>>`
+    return `${beg}${body}${end}`
 }
 
 function ErlTuple(arr) {
@@ -229,7 +232,7 @@ Erl.prototype.equals = function () {
     return true;
 }
 
-Erl.prototype.toString = function(obj) {
+Erl.prototype.toString = function(obj, opts = {}) {
     if (obj === undefined) return "undefined";
     if (obj === null)      return "null";
 
@@ -239,11 +242,11 @@ Erl.prototype.toString = function(obj) {
         case 'string':  return `"${obj.toString()}"`;
     }
     if (ErlObject.prototype.isPrototypeOf(obj))
-        return obj.toString();
+        return obj.toString(opts);
     if (obj instanceof Array)
-        return `[${obj.map((e) => Erl.toString(e)).join(",")}]`;
+        return `[${obj.map((e) => Erl.toString(e, opts)).join(",")}]`;
 
-    const body = Object.keys(obj).map((k) => `{${k},${Erl.toString(obj[k])}}`).join(",");
+    const body = Object.keys(obj).map((k) => `{${k},${Erl.toString(obj[k], opts)}}`).join(",");
     return `[${body}]`;
 }
 

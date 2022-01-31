@@ -10,18 +10,30 @@ Include erlb.js to your project.
 
 ## Interface ##
 
-* <b>Erl.encode(Object)</b> - Encode a Javascript object into ETF, return ArrayBuffer
+* <b>Erl.encode(obj, opts)</b> - Encode a Javascript object into ETF, return ArrayBuffer
     suitable for sending via websocket. The object can be a Boolean, Integer, Float,
     String, Array, Object (treated as a proplist) or an Atom, Binary,
     or Tuple (with the help of Erl.atom(), Erl.binary(), or Erl.tuple(), respectively).
-* <b>Erl.decode(ArrayBuffer)</b> - Decode a binary ArrayBuffer into a Javascript object.
-* <b>Erl.equals(Obj1, Obj2)</b> - Compare Obj1 and Obj2 for equality.
-* <b>Erl.toString(Obj)</b> - Print a Javascript object in the Erlang notation.
-* <b>Erl.atom(String)</b> - Create a Javascript object that will be encoded to an Atom.
-* <b>Erl.binary(UInt8Array)</b> - Create a Javascript object that will be encoded to an Binary.
-* <b>Erl.tuple(Array)</b> - Create a Javascript object that will be encoded to a Tuple.
-* <b>Erl.pid(Node, Id, Ser, Creation)</b> - Create a Javascript object that will be encoded to a Pid.
-* <b>Erl.ref(Node, Creation, IDs)</b> - Create a Javascript object that will be encoded to a Ref.
+    The `opts` argument is optional and may contain the following settings:
+
+    | Value      | Values                   | Default  | Description                                   |
+    |------------|--------------------------|----------|-----------------------------------------------|
+    | mapKeyType | 'atom'/'binary'/'string' | 'binary' | Encode object's map keys using this data type |
+      
+* <b>Erl.decode(arrayBuffer)</b> - Decode a binary ArrayBuffer into a Javascript object.
+* <b>Erl.equals(obj1, obj2)</b> - Compare Obj1 and Obj2 for equality.
+* <b>Erl.toString(obj, opts)</b> - Print a Javascript object in the Erlang notation.
+    The `opts` argument is optional and may contain the following settings:
+
+    | Value      | Values                   | Default  | Description                                   |
+    |------------|--------------------------|----------|-----------------------------------------------|
+    | compact    | true/false               | false    | Print binaries in compact form (using backticks instead of `<<"">>` enclosures |
+ 
+* <b>Erl.atom(string)</b> - Create a Javascript object that will be encoded to an Atom.
+* <b>Erl.binary(uInt8Array)</b> - Create a Javascript object that will be encoded to an Binary.
+* <b>Erl.tuple(array)</b> - Create a Javascript object that will be encoded to a Tuple.
+* <b>Erl.pid(node, id, ser, creation)</b> - Create a Javascript object that will be encoded to a Pid.
+* <b>Erl.ref(node, creation, ids)</b> - Create a Javascript object that will be encoded to a Ref.
 
 The library natively understands the following Javascript types:
 
@@ -33,12 +45,12 @@ The library natively understands the following Javascript types:
 
 ### Utility Functions ###
 
-* <b>Erl.toArrayBuffer(Array)</b> - Convert array of bytes to a binary buffer.
-* <b>Erl.bufferToArray(ArrayBuffer)</b> - Convert a binary buffer to an array of bytes.
-* <b>Erl.timestampToTuple(Int)</b> - Convert a timestamp (number of ms since epoch) to
-    {MegaSec, Sec, MicroSec} tuple.
-* <b>Erl.dateToTuple(Date)</b> - Convert a Javascript Date to
-    {MegaSec, Sec, MicroSec} tuple.
+* <b>Erl.toArrayBuffer(array)</b> - Convert array of bytes to a binary buffer.
+* <b>Erl.bufferToArray(arrayBuffer)</b> - Convert a binary buffer to an array of bytes.
+* <b>Erl.timestampToTuple(int)</b> - Convert a timestamp (number of ms since epoch) to
+    {megaSec, sec, microSec} tuple.
+* <b>Erl.dateToTuple(date)</b> - Convert a Javascript Date to
+    {megaSec, sec, microSec} tuple.
 
 ## Testing ##
 
