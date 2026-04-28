@@ -290,6 +290,7 @@ Erl.prototype.Enum = {
     SMALL_ATOM      : 115, // 's'
     ATOM            : 100, // 'd'
     ATOM_UTF8       : 118, // 'v'
+    SMALL_ATOM_UTF8 : 119, // 'w'
     BINARY          : 109, // 'm'
     BIT_BINARY      : 77,  // 'M'
     SMALL_INTEGER   : 97 , // 'a'
@@ -682,6 +683,8 @@ Erl.prototype.decode_inner = function(obj) {
     switch (type) {
         case this.Enum.SMALL_ATOM:      return this.decode_atom(obj);
         case this.Enum.ATOM:            return this.decode_atom(obj);
+        case this.Enum.ATOM_UTF8:       return this.decode_atom(obj);
+        case this.Enum.SMALL_ATOM_UTF8: return this.decode_atom(obj);
         case this.Enum.STRING:          return this.decode_string(obj);
         case this.Enum.SMALL_INTEGER:   return this.decode_integer(obj);
         case this.Enum.INTEGER:
@@ -708,9 +711,11 @@ Erl.prototype.decode_atom = function(obj) {
     var n, type = dv.getUint8(offset++);
     switch (type) {
         case this.Enum.ATOM:
+        case this.Enum.ATOM_UTF8:
             n = dv.getUint16(offset); offset += 2;
             break;
         case this.Enum.SMALL_ATOM:
+        case this.Enum.SMALL_ATOM_UTF8:
             n = dv.getUint8(offset++);
             break;
         default:
