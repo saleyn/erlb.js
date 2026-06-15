@@ -328,7 +328,9 @@ Erl.prototype.Encoding = {
 }
 
 Erl.prototype.encode_size = function(obj, opts = {}) {
-    if (obj === null || obj === undefined)
+    if (obj === null)
+        return this.atom("nil").encodeSize();
+    if (obj === undefined)
         return this.atom(String(obj)).encodeSize();
     switch (typeof(obj)) {
         case "number":      return this.encode_number_size(obj);
@@ -360,7 +362,9 @@ Erl.prototype.encode_inner = function (obj, dataView, offset, opts = {}) {
 };
 
 Erl.prototype.encode_object = function(obj, dv, offset, opts = {}) {
-    if (obj === null || obj === undefined)
+    if (obj === null)
+        return this.encode_atom("nil", dv, offset);
+    if (obj === undefined)
         return this.encode_atom(String(obj), dv, offset);
 
     switch (obj.type) {
@@ -646,7 +650,7 @@ Erl.prototype.encode_assoc_array_size = function(obj) {
                       +  this.atom(k).encodeSize() + this.encode_size(p[k]);
                 }
             if (len != 1)
-              throw new Error(`Invalid size of tuple inside a proplist: ${JSON.stringify(tmp)}`); 
+              throw new Error(`Invalid size of tuple inside a proplist: ${JSON.stringify(tmp)}`);
             return a;
         },
         6 // list begin/end
@@ -666,7 +670,7 @@ Erl.prototype.encode_assoc_array = function(obj, dv, offset) {
                 val = item[k];
             }
         if (len != 1)
-          throw new Error(`Invalid size of tuple inside a proplist: ${JSON.stringify(item)}`); 
+          throw new Error(`Invalid size of tuple inside a proplist: ${JSON.stringify(item)}`);
         obj[i] = this.tuple(this.atom(key), val);
     }
     return this.encode_array(obj, dv, offset);
@@ -727,10 +731,11 @@ Erl.prototype.decode_atom = function(obj) {
     var s = String.fromCharCode.apply(String, a);
     var v;
     switch (s) {
-        case "true":      v = true;          break;
-        case "false":     v = false;         break;
+        case "true":      v = true;      break;
+        case "false":     v = false;     break;
         case "undefined": v = undefined; break;
-        case "null":      v = null;          break;
+        case "null":
+        case "nil":       v = null;      break;
         default:          v = this.atom(s);
     }
     return { value: v, offset: offset };
