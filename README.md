@@ -1,5 +1,7 @@
 # erlb.js #
 
+> NOTE: This project has been deprecated by transitioning to [flick](https://github.com/saleyn/flick)
+
 Javascript binary support of Erlang External Term Format (ETF)
 
 ## Installation ##
